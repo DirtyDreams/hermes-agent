@@ -35,5 +35,8 @@ export function buildApp() {
   // Health check
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
 
+  // Routes
+  app.register(import('./modules/auth/auth.routes.js'), { prefix: '/api/v1/auth' })
+
   return app
 }
