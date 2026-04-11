@@ -43,4 +43,10 @@ export default async function discoveryRoutes(app: FastifyInstance) {
     const matches = await getMatches(request.user.sub)
     return reply.send(matches)
   })
+
+  app.get('/verified', async (request, reply) => {
+    const { limit } = request.query as any
+    const profiles = await import('./discovery.service.js').then(m => m.getVerifiedProfiles(Number(limit) || 6))
+    return reply.send(profiles)
+  })
 }

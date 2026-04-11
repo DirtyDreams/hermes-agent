@@ -34,6 +34,8 @@ export function buildApp() {
   })
 
   app.register(authenticate)
+  app.register(import('./plugins/redis.js'))
+  app.register(import('./plugins/socket.js'))
 
   // Health check
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))
@@ -44,6 +46,7 @@ export function buildApp() {
   app.register(import('./modules/profiles/profiles.routes.js'), { prefix: '/api/v1/profiles' })
   app.register(import('./modules/discovery/discovery.routes.js'), { prefix: '/api/v1/discovery' })
   app.register(import('./modules/messaging/messaging.routes.js'), { prefix: '/api/v1/conversations' })
+  app.register(import('./modules/messaging/room.routes.js'), { prefix: '/api/v1/rooms' })
   app.register(import('./modules/events/events.routes.js'), { prefix: '/api/v1/events' })
   app.register(import('./modules/media/media.routes.js'), { prefix: '/api/v1/media' })
   app.register(import('./modules/couples/couples.routes.js'), { prefix: '/api/v1/couples' })

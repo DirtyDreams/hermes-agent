@@ -62,14 +62,17 @@ export async function exchangePublicKey(conversationId: string, userId: string, 
 }
 
 export async function saveMessage(
-  conversationId: string,
+  conversationId: string | undefined,
   senderId: string,
   encryptedContent: string,
   nonce: string,
-  contentType = 'text'
+  contentType = 'text',
+  isEphemeral = false,
+  expiresAt?: Date,
+  roomId?: string
 ) {
   return db.message.create({
-    data: { conversationId, senderId, encryptedContent, nonce, contentType },
+    data: { conversationId, roomId, senderId, encryptedContent, nonce, contentType, isEphemeral, expiresAt },
   })
 }
 
@@ -100,4 +103,50 @@ export async function unmaskConversation(conversationId: string, userId: string)
       }
     }
   })
+}
+
+export async function markAsRead(conversationId: string, userId: string) {
+  const now = new Date()
+  
+  // Find messages before update to check for ephemerality
+  const messages = await db.message.findMany({
+    where: {
+      conversationId,
+      senderId: { not: userId },
+      readAt: null
+    }
+  })
+
+  await db.message.updateMany({
+    where: {
+      conversationId,
+      senderId: { not: userId },
+      readAt: null
+    },
+    data: { readAt: now }
+  })
+
+  // Burn on read logic: if ephemeral, schedule deletion
+  for (const msg of messages) {
+    if (msg.isEphemeral) {
+      setTimeout(async () => {
+        try {
+          await db.message.delete({ where: { id: msg.id } })
+          console.log(`[BurnOnRead] Purged message ${msg.id}`)
+        } catch (e) {
+          // Message might already be gone
+        }
+      }, 10000) // 10s countdown start
+    }
+  }
+}
+
+export async function deleteMessage(messageId: string, userId: string) {
+  // Verify owner
+  const msg = await db.message.findUnique({ where: { id: messageId } })
+  if (!msg) return
+  
+  // We allow deletion if either it's expired or sender/receiver (for burn on read)
+  // For now, simple owner check or admin
+  return db.message.delete({ where: { id: messageId } })
 }

@@ -114,3 +114,21 @@ export async function getMatches(userId: string) {
     orderBy: { createdAt: 'desc' },
   })
 }
+
+export async function getVerifiedProfiles(limit = 6) {
+  return db.profile.findMany({
+    where: {
+      verificationStatus: 'verified',
+      isVisible: true,
+    },
+    include: {
+      photos: { 
+        where: { purpose: 'profile_photo' }, 
+        orderBy: { order: 'asc' }, 
+        take: 1 
+      }
+    },
+    take: limit,
+    orderBy: { createdAt: 'desc' },
+  })
+}

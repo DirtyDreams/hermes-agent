@@ -1,15 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildApp } from '../app.js'
-import { db } from '../lib/db.js'
+import { clearDatabase } from './test-utils.js'
 
 describe('Messaging Module', () => {
   beforeEach(async () => {
-    await db.message.deleteMany()
-    await db.conversation.deleteMany()
-    await db.match.deleteMany()
-    await db.vibe.deleteMany()
-    await db.couple.deleteMany()
-    await db.user.deleteMany()
+    await clearDatabase()
   })
 
   it('Exchanges public keys and fetches history', async () => {
@@ -19,7 +14,15 @@ describe('Messaging Module', () => {
     const reg1 = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/register',
-      payload: { email: 'm1@e.com', password: 'Password123!', phone: '+15551111111', dateOfBirth: '1990-01-01T00:00:00.000Z' }
+      payload: { 
+        email: 'm1@e.com', 
+        password: 'Password123!', 
+        phone: '+15551111111', 
+        dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'm1user',
+        publicKey: 'test-key-1'
+      }
     })
     const u1Token = JSON.parse(reg1.body).accessToken
     const u1Id = JSON.parse(reg1.body).user.id
@@ -27,7 +30,15 @@ describe('Messaging Module', () => {
     const reg2 = await app.inject({
       method: 'POST',
       url: '/api/v1/auth/register',
-      payload: { email: 'm2@e.com', password: 'Password123!', phone: '+15552222222', dateOfBirth: '1990-01-01T00:00:00.000Z' }
+      payload: { 
+        email: 'm2@e.com', 
+        password: 'Password123!', 
+        phone: '+15552222222', 
+        dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'WOMAN',
+        nickname: 'm2user',
+        publicKey: 'test-key-2'
+      }
     })
     const u2Token = JSON.parse(reg2.body).accessToken
     const u2Id = JSON.parse(reg2.body).user.id
@@ -56,7 +67,13 @@ describe('Messaging Module', () => {
       payload: { publicKey: 'user1-key' }
     })
     expect(keyRes.statusCode).toBe(200)
-    expect(JSON.parse(keyRes.body).keyA).toBe('user1-key')
+    const body = JSON.parse(keyRes.body)
+    const isUserA = u1Id < u2Id // Matches sorting logic in discovery service
+    if (isUserA) {
+      expect(body.keyA).toBe('user1-key')
+    } else {
+      expect(body.keyB).toBe('user1-key')
+    }
 
     // 3. Save a message (via service since socket testing is complex in memory)
     const { saveMessage } = await import('../modules/messaging/messaging.service.js')

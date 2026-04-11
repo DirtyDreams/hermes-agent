@@ -5,11 +5,37 @@ import {
   exchangePublicKey,
   unmaskConversation,
   saveMessage,
+  markAsRead,
 } from './messaging.service.js'
+import { PresenceService } from './presence.service.js'
 
 export default async function messagingRoutes(app: FastifyInstance) {
+  const presenceService = new PresenceService(app)
+
   app.get('/', { onRequest: [app.authenticate] }, async (request: any, reply) => {
-    return reply.send(await getConversations(request.user.sub))
+    const userId = request.user.sub
+    const conversations: any = await getConversations(userId)
+    
+    // Extract other user IDs to check presence
+    const otherUserIds = conversations.map((conv: any) => 
+      conv.match.userAId === userId ? conv.match.userBId : conv.match.userAId
+    )
+    
+    const presenceMap = await presenceService.getPresenceMulti(otherUserIds)
+    
+    // Enrich conversations with presence
+    const enriched = conversations.map((conv: any) => {
+      const otherId = conv.match.userAId === userId ? conv.match.userBId : conv.match.userAId
+      return {
+        ...conv,
+        otherUser: {
+          id: otherId,
+          isOnline: presenceMap[otherId] || false
+        }
+      }
+    })
+
+    return reply.send(enriched)
   })
 
   app.get('/:id', { onRequest: [app.authenticate] }, async (request: any, reply) => {
@@ -69,5 +95,11 @@ export default async function messagingRoutes(app: FastifyInstance) {
     } catch (err: any) {
       return reply.status(500).send({ status: 'error', message: err.message })
     }
+  })
+
+  app.post('/:id/read', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    const { id } = request.params as { id: string }
+    await markAsRead(id, request.user.sub)
+    return reply.send({ status: 'success' })
   })
 }

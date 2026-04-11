@@ -2,9 +2,11 @@ import type { Prisma } from '@prisma/client'
 import {
   CreatePostSchema,
   UpdatePostSchema,
+  CreateCommentSchema,
   assertNonEmptyPost,
   type ReactionType,
 } from '@velvet/shared'
+import type { FastifyInstance } from 'fastify'
 import { db } from '../../lib/db.js'
 import { getPublicUrl } from '../../lib/storage.js'
 
@@ -16,12 +18,24 @@ export type PostAuthorDto = {
   avatarUrl: string | null
 }
 
+export type CommentDto = {
+  id: string
+  content: string
+  createdAt: string
+  author: PostAuthorDto
+}
+
 export type PostDto = {
   id: string
   content: string
   visibility: string
   mediaKeys: string[]
   mediaUrls: string[]
+  isEncrypted: boolean
+  hashtags: string[]
+  location: string | null
+  commentCount: number
+  latestComments: CommentDto[]
   createdAt: string
   updatedAt: string
   author: PostAuthorDto
@@ -98,9 +112,39 @@ const postInclude = {
     },
   },
   reactions: true,
+  comments: {
+    include: {
+      author: {
+        include: {
+          profile: { include: { photos: { orderBy: { order: 'asc' as const }, take: 1 } } },
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 3,
+  },
+  _count: {
+    select: { comments: true },
+  },
 } satisfies Prisma.PostInclude
 
 type PostLoaded = Prisma.PostGetPayload<{ include: typeof postInclude }>
+type CommentLoaded = Exclude<PostLoaded['comments'][number], undefined>
+
+function toCommentDto(c: CommentLoaded): CommentDto {
+  const profile = c.author.profile
+  return {
+    id: c.id,
+    content: c.content,
+    createdAt: c.createdAt.toISOString(),
+    author: {
+      id: c.userId,
+      nickname: profile?.nickname ?? null,
+      displayName: profile?.displayName ?? null,
+      avatarUrl: profile?.photos?.[0]?.cdnUrl ?? null,
+    },
+  }
+}
 
 function reactionCounts(reactions: { type: string }[]): Record<string, number> {
   const out: Record<string, number> = {}
@@ -123,6 +167,11 @@ export function toPostDto(post: PostLoaded, viewerId: string): PostDto {
     visibility: post.visibility,
     mediaKeys: post.mediaKeys,
     mediaUrls: post.mediaKeys.map((k) => getPublicUrl(k)),
+    isEncrypted: post.isEncrypted,
+    hashtags: post.hashtags,
+    location: post.location,
+    commentCount: post._count.comments,
+    latestComments: post.comments.map(toCommentDto),
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
     author: {
@@ -149,12 +198,12 @@ function decodeCursor(cursor: string): { createdAt: Date; id: string } {
   return { createdAt, id }
 }
 
-export async function createPost(userId: string, body: unknown) {
+export async function createPost(app: FastifyInstance, userId: string, body: unknown) {
   const parsed = CreatePostSchema.safeParse(body)
   if (!parsed.success) {
     throw new HttpError(JSON.stringify(parsed.error.format()), 400)
   }
-  const { content, visibility, mediaKeys } = parsed.data
+  const { content, visibility, mediaKeys, isEncrypted, hashtags, location } = parsed.data
   try {
     assertNonEmptyPost(content, mediaKeys)
   } catch (e) {
@@ -169,13 +218,21 @@ export async function createPost(userId: string, body: unknown) {
       content,
       visibility,
       mediaKeys,
+      isEncrypted,
+      hashtags,
+      location,
     },
     include: postInclude,
   })
-  return toPostDto(post, userId)
+
+  const dto = toPostDto(post, userId)
+  app.io.emit('post:new', { post: dto })
+  await app.redis.del('feed:global')
+
+  return dto
 }
 
-export async function updatePost(userId: string, postId: string, body: unknown) {
+export async function updatePost(app: FastifyInstance, userId: string, postId: string, body: unknown) {
   const existing = await db.post.findUnique({ where: { id: postId } })
   if (!existing || existing.authorId !== userId) {
     throw new HttpError('Post not found', 404)
@@ -207,24 +264,47 @@ export async function updatePost(userId: string, postId: string, body: unknown) 
       ...(patch.content !== undefined ? { content: patch.content } : {}),
       ...(patch.visibility !== undefined ? { visibility: patch.visibility } : {}),
       ...(patch.mediaKeys !== undefined ? { mediaKeys: patch.mediaKeys } : {}),
+      ...(patch.isEncrypted !== undefined ? { isEncrypted: patch.isEncrypted } : {}),
+      ...(patch.hashtags !== undefined ? { hashtags: patch.hashtags } : {}),
+      ...(patch.location !== undefined ? { location: patch.location } : {}),
     },
     include: postInclude,
   })
-  return toPostDto(post, userId)
+
+  const dto = toPostDto(post, userId)
+  app.io.emit('post:update', { post: dto })
+  await app.redis.del('feed:global')
+
+  return dto
 }
 
-export async function deletePost(userId: string, postId: string) {
+export async function deletePost(app: FastifyInstance, userId: string, postId: string) {
   const existing = await db.post.findUnique({ where: { id: postId } })
   if (!existing || existing.authorId !== userId) {
     throw new HttpError('Post not found', 404)
   }
   await db.post.delete({ where: { id: postId } })
+  app.io.emit('post:delete', { postId })
+  await app.redis.del('feed:global')
 }
 
 export async function listTimeline(
+  app: FastifyInstance,
   viewerId: string,
   opts: { cursor?: string; limit: number }
 ) {
+  const isFirstPage = !opts.cursor && opts.limit <= 20
+  if (isFirstPage) {
+    const cached = await app.redis.get('feed:global')
+    if (cached) {
+      try {
+        return JSON.parse(cached)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const unlocked = await getUnlockedProfileIds(viewerId)
   const baseWhere = timelineWhereForViewer(viewerId, unlocked)
 
@@ -237,7 +317,12 @@ export async function listTimeline(
         {
           OR: [
             { createdAt: { lt: createdAt } },
-            { AND: [{ createdAt }, { id: { lt: id } }] },
+            {
+              AND: [
+                { createdAt: { equals: createdAt } },
+                { id: { lt: id } },
+              ],
+            },
           ],
         },
       ],
@@ -259,10 +344,16 @@ export async function listTimeline(
       ? encodeCursor(page[page.length - 1].createdAt, page[page.length - 1].id)
       : null
 
-  return {
+  const result = {
     data: page.map((p) => toPostDto(p, viewerId)),
     nextCursor,
   }
+
+  if (isFirstPage) {
+    await app.redis.setex('feed:global', 60, JSON.stringify(result))
+  }
+
+  return result
 }
 
 async function resolveWallAuthorIds(profileId: string): Promise<string[]> {
@@ -315,7 +406,12 @@ export async function listPostsForProfile(
         {
           OR: [
             { createdAt: { lt: createdAt } },
-            { AND: [{ createdAt }, { id: { lt: id } }] },
+            {
+              AND: [
+                { createdAt: { equals: createdAt } },
+                { id: { lt: id } },
+              ],
+            },
           ],
         },
       ],
@@ -365,6 +461,7 @@ export async function canViewerReadPost(
 }
 
 export async function setReaction(
+  app: FastifyInstance,
   viewerId: string,
   postId: string,
   type: ReactionType
@@ -394,10 +491,14 @@ export async function setReaction(
     include: postInclude,
   })
   if (!updated) throw new HttpError('Post not found', 404)
-  return toPostDto(updated, viewerId)
+  
+  const dto = toPostDto(updated, viewerId)
+  app.io.emit('post:reaction', { postId, reactionCounts: dto.reactionCounts })
+  
+  return dto
 }
 
-export async function removeReaction(viewerId: string, postId: string) {
+export async function removeReaction(app: FastifyInstance, viewerId: string, postId: string) {
   const post = await db.post.findUnique({
     where: { id: postId },
     include: postInclude,
@@ -419,5 +520,80 @@ export async function removeReaction(viewerId: string, postId: string) {
     include: postInclude,
   })
   if (!updated) throw new HttpError('Post not found', 404)
-  return toPostDto(updated, viewerId)
+  
+  const dto = toPostDto(updated, viewerId)
+  app.io.emit('post:reaction', { postId, reactionCounts: dto.reactionCounts })
+  
+  return dto
+}
+
+export async function addComment(app: FastifyInstance, userId: string, postId: string, body: unknown) {
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    include: postInclude,
+  })
+  if (!post) throw new HttpError('Post not found', 404)
+  
+  const unlocked = await getUnlockedProfileIds(userId)
+  if (!(await canViewerReadPost(post, userId, unlocked))) {
+    throw new HttpError('Post not found', 404)
+  }
+
+  const parsed = CreateCommentSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new HttpError(JSON.stringify(parsed.error.format()), 400)
+  }
+
+  const comment = await db.comment.create({
+    data: {
+      postId,
+      userId,
+      content: parsed.data.content,
+    },
+    include: {
+      author: {
+        include: {
+          profile: { include: { photos: { orderBy: { order: 'asc' as const }, take: 1 } } },
+        },
+      },
+    },
+  })
+
+  const count = await db.comment.count({ where: { postId } })
+  const dto = toCommentDto(comment)
+  
+  app.io.emit('post:comment', { postId, commentCount: count, comment: dto })
+  
+  return dto
+}
+
+export async function listComments(postId: string, opts: { cursor?: string; limit: number }) {
+  const take = Math.min(opts.limit + 1, 101)
+  const where: Prisma.CommentWhereInput = { postId }
+  
+  if (opts.cursor) {
+    where.id = { lt: opts.cursor }
+  }
+
+  const rows = await db.comment.findMany({
+    where,
+    orderBy: { id: 'desc' },
+    take,
+    include: {
+      author: {
+        include: {
+          profile: { include: { photos: { orderBy: { order: 'asc' as const }, take: 1 } } },
+        },
+      },
+    },
+  })
+
+  const hasMore = rows.length > opts.limit
+  const data = hasMore ? rows.slice(0, opts.limit) : rows
+  const nextCursor = hasMore && data.length > 0 ? data[data.length - 1].id : null
+
+  return {
+    data: data.map(toCommentDto),
+    nextCursor,
+  }
 }

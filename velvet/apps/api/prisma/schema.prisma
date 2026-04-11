@@ -21,11 +21,12 @@ model User {
   deletedAt       DateTime?
   publicKey       String?   // RSA Public Key for E2EE
   credits         Int       @default(0)
-
-  profile     Profile?
-  posts       Post[]    @relation("UserPosts")
-  reactions   PostReaction[]
-  sessions    Session[]
+  
+  profile         Profile?
+  posts           Post[]    @relation("UserPosts")
+  reactions       PostReaction[]
+  comments        Comment[]
+  sessions        Session[]
   sentVibes   Vibe[]    @relation("VibeSender")
   receivedVibes Vibe[]  @relation("VibeReceiver")
   matchesA    Match[]   @relation("MatchUserA")
@@ -34,6 +35,7 @@ model User {
   coupleAsP1  Couple?   @relation("CouplePartner1")
   coupleAsP2  Couple?   @relation("CouplePartner2")
   profileUnlocks ProfileUnlock[]
+  roomMemberships RoomMember[]
 }
 
 model Session {
@@ -160,9 +162,35 @@ model Conversation {
   messages Message[]
 }
 
+model Room {
+  id          String   @id @default(uuid())
+  name        String?
+  type        String   @default("GROUP") // MATCH_GROUP | SOCIAL_ROOM
+  isEncrypted Boolean  @default(true)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  members     RoomMember[]
+  messages    Message[]
+}
+
+model RoomMember {
+  id        String   @id @default(uuid())
+  roomId    String
+  userId    String
+  role      String   @default("MEMBER") // ADMIN | MEMBER
+  joinedAt  DateTime @default(now())
+
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
 model Message {
   id               String    @id @default(uuid())
-  conversationId   String
+  conversationId   String?
+  roomId           String?
   senderId         String
   encryptedContent String
   nonce            String
@@ -170,9 +198,11 @@ model Message {
   createdAt        DateTime  @default(now())
   readAt           DateTime?
   expiresAt        DateTime?
+  isEphemeral      Boolean   @default(false)
 
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-  sender       User         @relation(fields: [senderId], references: [id])
+  conversation Conversation? @relation(fields: [conversationId], references: [id])
+  room         Room?         @relation(fields: [roomId], references: [id])
+  sender       User          @relation(fields: [senderId], references: [id])
 }
 
 model Event {
@@ -217,12 +247,28 @@ model Post {
   authorId    String
   content     String
   mediaKeys   String[]
-  visibility  String   @default("PUBLIC") // PUBLIC | UNLOCKED_ONLY | DRAFT
+  visibility  String   @default(value: "PUBLIC") // PUBLIC | UNLOCKED_ONLY | DRAFT
+  isEncrypted Boolean  @default(value: false)
+  hashtags    String[]
+  location    String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   author      User     @relation("UserPosts", fields: [authorId], references: [id])
   reactions   PostReaction[]
+  comments    Comment[]
+}
+
+model Comment {
+  id          String   @id @default(uuid())
+  postId      String
+  userId      String
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  post        Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
 }
 
 model PostReaction {

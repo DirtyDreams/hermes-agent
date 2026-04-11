@@ -23,8 +23,11 @@ export async function registerUser(input: RegisterInput) {
       emailHash,
       passwordHash,
       phone: input.phone,
+      publicKey: input.publicKey,
       profile: {
         create: {
+          nickname: input.nickname,
+          accountType: input.accountType,
           dateOfBirth: new Date(input.dateOfBirth),
         },
       },

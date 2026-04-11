@@ -45,26 +45,56 @@ export async function setupSocketIO(app: FastifyInstance) {
 
     socket.join(userId)
 
-    socket.on('message:send', async (data: { conversationId: string, encryptedContent: string, nonce: string }, callback) => {
+    socket.on('message:send', async (data: { 
+      conversationId?: string, 
+      roomId?: string,
+      encryptedContent: string, 
+      nonce: string, 
+      contentType?: string,
+      isEphemeral?: boolean,
+      expiresAt?: string
+    }, callback) => {
       try {
-        // 1. Verify user is in conversation
-        const conv = await db.conversation.findUnique({
-          where: { id: data.conversationId },
-          include: { match: true }
-        })
-        if (!conv) return callback?.({ status: 'error', message: 'Conversation not found' })
-        
-        const { userAId, userBId } = conv.match
-        if (userId !== userAId && userId !== userBId) {
-          return callback?.({ status: 'error', message: 'Forbidden' })
+        let recipientIds: string[] = []
+
+        // 1. Context validation
+        if (data.conversationId) {
+          const conv = await db.conversation.findUnique({
+            where: { id: data.conversationId },
+            include: { match: true }
+          })
+          if (!conv) return callback?.({ status: 'error', message: 'Conversation not found' })
+          const { userAId, userBId } = conv.match
+          if (userId !== userAId && userId !== userBId) return callback?.({ status: 'error', message: 'Forbidden' })
+          recipientIds = [userId === userAId ? userBId : userAId]
+        } else if (data.roomId) {
+          const room = await db.room.findUnique({
+            where: { id: data.roomId },
+            include: { members: true }
+          })
+          if (!room) return callback?.({ status: 'error', message: 'Room not found' })
+          if (!room.members.some(m => m.userId === userId)) return callback?.({ status: 'error', message: 'Forbidden' })
+          recipientIds = room.members.map(m => m.userId).filter(id => id !== userId)
+        } else {
+          return callback?.({ status: 'error', message: 'No target (conversation or room)' })
         }
 
         // 2. Save to DB
-        const msg = await saveMessage(data.conversationId, userId, data.encryptedContent, data.nonce)
+        const msg = await saveMessage(
+          data.conversationId, 
+          userId, 
+          data.encryptedContent, 
+          data.nonce, 
+          data.contentType || 'text',
+          data.isEphemeral || false,
+          data.expiresAt ? new Date(data.expiresAt) : undefined,
+          data.roomId
+        )
 
-        // 3. Emit to other participant
-        const targetId = userId === userAId ? userBId : userAId
-        io.to(targetId).emit('message:receive', msg)
+        // 3. Broadcast to recipients
+        recipientIds.forEach(id => {
+          io.to(id).emit('message:receive', msg)
+        })
 
         callback?.({ status: 'ok', message: msg })
       } catch (err: any) {

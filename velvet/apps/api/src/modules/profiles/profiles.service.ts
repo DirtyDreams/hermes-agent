@@ -7,6 +7,12 @@ export async function getProfile(profileId: string) {
     where: { id: profileId },
     include: {
       photos: { orderBy: { order: 'asc' } },
+      coupleProfile: {
+        include: {
+          partner1: { select: { id: true, publicKey: true } },
+          partner2: { select: { id: true, publicKey: true } },
+        }
+      }
     },
   })
 }
@@ -14,7 +20,10 @@ export async function getProfile(profileId: string) {
 export async function getProfileByUserId(userId: string) {
   return db.profile.findUniqueOrThrow({
     where: { userId },
-    include: { photos: { orderBy: { order: 'asc' } } },
+    include: { 
+      photos: { orderBy: { order: 'asc' } },
+      coupleProfile: true
+    },
   })
 }
 
@@ -56,14 +65,31 @@ export async function unlockProfile(userId: string, targetProfileId: string) {
     if (existing) return existing
 
     // 2. Spend credits
-    await spendCredits(userId, UNLOCK_COST, 'BOOST' as any) // Reusing BOOST type for now
+    await spendCredits(userId, UNLOCK_COST, 'BOOST' as any)
 
-    // 3. Create unlock record
-    return tx.profileUnlock.create({
-      data: {
-        userId,
-        targetId: targetProfileId
-      }
+    // 3. Find if target belongs to a couple
+    const targetProfile = await tx.profile.findUnique({
+      where: { id: targetProfileId },
+      include: { coupleProfile: true }
     })
+
+    const profilesToUnlock = [targetProfileId]
+    if (targetProfile?.coupleProfile) {
+      // If couple, find the other partner's profile
+      const otherPartnerId = targetProfile.coupleProfile.partner1Id === targetProfile.id 
+        ? targetProfile.coupleProfile.partner2Id 
+        : targetProfile.coupleProfile.partner1Id
+      
+      if (otherPartnerId) profilesToUnlock.push(otherPartnerId)
+    }
+
+    // 4. Create unlock record(s)
+    return Promise.all(profilesToUnlock.map(id => 
+      tx.profileUnlock.upsert({
+        where: { userId_targetId: { userId, targetId: id } },
+        update: {},
+        create: { userId, targetId: id }
+      })
+    ))
   })
 }

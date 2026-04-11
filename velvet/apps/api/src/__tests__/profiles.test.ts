@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildApp } from '../app.js'
-import { db } from '../lib/db.js'
+import { clearDatabase } from './test-utils.js'
 
 describe('GET /api/v1/profiles/me', () => {
   beforeEach(async () => {
-    await db.couple.deleteMany()
-    await db.user.deleteMany()
+    await clearDatabase()
   })
 
   it('returns the authenticated user profile', async () => {
@@ -20,6 +19,9 @@ describe('GET /api/v1/profiles/me', () => {
         password: 'Password123!',
         phone: '+15550001111',
         dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'profileuser',
+        publicKey: 'test-public-key'
       },
     })
     const { accessToken } = JSON.parse(regRes.body)
@@ -57,6 +59,9 @@ describe('GET /api/v1/profiles/me', () => {
         password: 'Password123!',
         phone: '+15551112222',
         dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'partner1',
+        publicKey: 'test-key-1'
       },
     })
     const { accessToken } = JSON.parse(regRes.body)
@@ -82,7 +87,10 @@ describe('GET /api/v1/profiles/me', () => {
         email: 'p1@example.com', 
         password: 'Password123!', 
         phone: '+15551112222', 
-        dateOfBirth: '1990-01-01T00:00:00.000Z' 
+        dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'p1user',
+        publicKey: 'test-key-p1'
       }
     })
     const inviteRes = await app.inject({
@@ -100,7 +108,10 @@ describe('GET /api/v1/profiles/me', () => {
         email: 'p2@example.com', 
         password: 'Password123!', 
         phone: '+15552223333', 
-        dateOfBirth: '1990-01-01T00:00:00.000Z' 
+        dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'p2user',
+        publicKey: 'test-key-p2'
       }
     })
     const acceptRes = await app.inject({

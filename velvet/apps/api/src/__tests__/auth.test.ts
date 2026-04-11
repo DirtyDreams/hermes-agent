@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { buildApp } from '../app.js'
-import { db } from '../lib/db.js'
+import { clearDatabase } from './test-utils.js'
 
 describe('POST /api/v1/auth/register', () => {
   beforeEach(async () => {
-    // Clean up test users
-    await db.user.deleteMany()
+    await clearDatabase()
   })
 
   it('creates a user and returns tokens', async () => {
@@ -18,6 +17,9 @@ describe('POST /api/v1/auth/register', () => {
         password: 'Password123!',
         phone: '+15551234567',
         dateOfBirth: '1990-01-01T00:00:00.000Z',
+        accountType: 'MAN',
+        nickname: 'testuser',
+        publicKey: 'test-public-key'
       },
     })
     
@@ -32,6 +34,9 @@ describe('POST /api/v1/auth/register', () => {
       password: 'Password123!',
       phone: '+15551234567',
       dateOfBirth: '1990-01-01T00:00:00.000Z',
+      accountType: 'MAN',
+      nickname: 'dupuser',
+      publicKey: 'test-public-key'
     }
     await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
     const response = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
@@ -45,6 +50,9 @@ describe('POST /api/v1/auth/register', () => {
       password: 'Password123!',
       phone: '+15551234567',
       dateOfBirth: '1990-01-01T00:00:00.000Z',
+      accountType: 'MAN',
+      nickname: 'loginuser',
+      publicKey: 'test-public-key'
     }
     
     // Register first
@@ -72,6 +80,9 @@ describe('POST /api/v1/auth/register', () => {
       password: 'Password123!',
       phone: '+15551234567',
       dateOfBirth: '1990-01-01T00:00:00.000Z',
+      accountType: 'MAN',
+      nickname: 'refreshuser',
+      publicKey: 'test-public-key'
     }
     
     const regResponse = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
@@ -95,6 +106,9 @@ describe('POST /api/v1/auth/register', () => {
       password: 'Password123!',
       phone: '+15551234567',
       dateOfBirth: '1990-01-01T00:00:00.000Z',
+      accountType: 'MAN',
+      nickname: 'logoutuser',
+      publicKey: 'test-public-key'
     }
     
     const regResponse = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
