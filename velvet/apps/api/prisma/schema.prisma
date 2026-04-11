@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  emailHash       String    @unique
+  passwordHash    String
+  phone           String?
+  phoneHash       String?   @unique
+  isEmailVerified Boolean   @default(false)
+  isPhoneVerified Boolean   @default(false)
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  profile     Profile?
+  sessions    Session[]
+  sentVibes   Vibe[]    @relation("VibeSender")
+  receivedVibes Vibe[]  @relation("VibeReceiver")
+  matchesA    Match[]   @relation("MatchUserA")
+  matchesB    Match[]   @relation("MatchUserB")
+  sentMessages Message[]
+  coupleAsP1  Couple?   @relation("CouplePartner1")
+  coupleAsP2  Couple?   @relation("CouplePartner2")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Profile {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  displayName        String?
+  bio                String?
+  dateOfBirth        DateTime?
+  locationCity       String?
+  locationLat        Float?
+  locationLng        Float?
+  relationshipStatus String?
+  lookingFor         String[]
+  experienceLevel    String?
+  lifestyleTags      String[]
+  verificationStatus String   @default("unverified")
+  verificationPhoto  String?
+  isVisible          Boolean  @default(false)
+  isCouple           Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photos MediaFile[]
+  coupleProfile Couple? @relation("CoupleSharedProfile")
+}
+
+model Couple {
+  id          String   @id @default(uuid())
+  partner1Id  String   @unique
+  partner2Id  String?  @unique
+  profileId   String?  @unique
+  status      String   @default("pending")
+  inviteToken String   @unique @default(uuid())
+  createdAt   DateTime @default(now())
+
+  partner1 User    @relation("CouplePartner1", fields: [partner1Id], references: [id])
+  partner2 User?   @relation("CouplePartner2", fields: [partner2Id], references: [id])
+  profile  Profile? @relation("CoupleSharedProfile", fields: [profileId], references: [id])
+}
+
+model MediaFile {
+  id        String   @id @default(uuid())
+  profileId String
+  r2Key     String   @unique
+  cdnUrl    String
+  purpose   String   @default("profile_photo")
+  order     Int      @default(0)
+  isBlurred Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+}
+
+model Vibe {
+  id         String   @id @default(uuid())
+  senderId   String
+  receiverId String
+  type       String
+  createdAt  DateTime @default(now())
+
+  sender   User @relation("VibeSender", fields: [senderId], references: [id])
+  receiver User @relation("VibeReceiver", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  userAId   String
+  userBId   String
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+
+  userA        User          @relation("MatchUserA", fields: [userAId], references: [id])
+  userB        User          @relation("MatchUserB", fields: [userBId], references: [id])
+  conversation Conversation?
+
+  @@unique([userAId, userBId])
+}
+
+model ModelMatch {
+  id        String   @id @default(uuid())
+  // Placeholder to avoid name collisions if needed, but the plan used Match
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  matchId   String   @unique
+  keyA      String?
+  keyB      String?
+  createdAt DateTime @default(now())
+
+  match    Match     @relation(fields: [matchId], references: [id])
+  messages Message[]
+}
+
+model Message {
+  id               String    @id @default(uuid())
+  conversationId   String
+  senderId         String
+  encryptedContent String
+  nonce            String
+  contentType      String    @default("text")
+  createdAt        DateTime  @default(now())
+  readAt           DateTime?
+  expiresAt        DateTime?
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+}
+
+model Event {
+  id                   String   @id @default(uuid())
+  title                String
+  description          String?
+  eventType            String
+  locationCity         String
+  locationFuzzy        String?
+  startDatetime        DateTime
+  endDatetime          DateTime?
+  capacity             Int?
+  verificationRequired String   @default("selfie")
+  status               String   @default("published")
+  externalUrl          String?
+  createdAt            DateTime @default(now())
+}
