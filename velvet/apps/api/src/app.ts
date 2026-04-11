@@ -3,6 +3,7 @@ import cors from '@fastify/cors'
 import cookie from '@fastify/cookie'
 import jwt from '@fastify/jwt'
 import rateLimit from '@fastify/rate-limit'
+import { authenticate } from './plugins/authenticate.js'
 
 export function buildApp() {
   const app = Fastify({
@@ -31,6 +32,8 @@ export function buildApp() {
     max: 100,
     timeWindow: '1 minute',
   })
+
+  app.register(authenticate)
 
   // Health check
   app.get('/health', async () => ({ status: 'ok', timestamp: new Date().toISOString() }))

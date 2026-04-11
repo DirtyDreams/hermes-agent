@@ -64,4 +64,49 @@ describe('POST /api/v1/auth/register', () => {
     const body = JSON.parse(response.body)
     expect(body).toHaveProperty('accessToken')
   })
+
+  it('refreshes the access token', async () => {
+    const app = buildApp()
+    const payload = {
+      email: 'refresh@example.com',
+      password: 'Password123!',
+      phone: '+15551234567',
+      dateOfBirth: '1990-01-01T00:00:00.000Z',
+    }
+    
+    const regResponse = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
+    const cookies = regResponse.cookies
+    const refreshToken = cookies.find(c => c.name === 'refreshToken')?.value
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/refresh',
+      cookies: { refreshToken: refreshToken || '' }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(JSON.parse(response.body)).toHaveProperty('accessToken')
+  })
+
+  it('logs out and clears cookies', async () => {
+    const app = buildApp()
+    const payload = {
+      email: 'logout@example.com',
+      password: 'Password123!',
+      phone: '+15551234567',
+      dateOfBirth: '1990-01-01T00:00:00.000Z',
+    }
+    
+    const regResponse = await app.inject({ method: 'POST', url: '/api/v1/auth/register', payload })
+    const refreshToken = regResponse.cookies.find(c => c.name === 'refreshToken')?.value
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/logout',
+      cookies: { refreshToken: refreshToken || '' }
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.cookies.find(c => c.name === 'refreshToken')?.value).toBe('')
+  })
 })
