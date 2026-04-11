@@ -8,6 +8,7 @@ import Conversations from './pages/Conversations'
 import Chat from './pages/Chat'
 import Onboarding from './pages/Onboarding'
 import LiveBoard from './pages/LiveBoard'
+import CoupleInvite from './pages/CoupleInvite'
 import Layout from './components/Layout'
 
 const queryClient = new QueryClient()
@@ -33,6 +34,7 @@ export default function App() {
             <Route index element={<Feed />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="board" element={<LiveBoard />} />
+            <Route path="couple/invite" element={<CoupleInvite />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="chat/:id" element={<Chat />} />
           </Route>

@@ -23,20 +23,33 @@ export async function createLinkInvite(userId: string) {
 }
 
 export async function acceptLinkInvite(userId: string, inviteToken: string) {
-  const invite = await db.couple.findUnique({
-    where: { inviteToken }
-  })
+  return db.$transaction(async (tx) => {
+    const invite = await tx.couple.findUnique({
+      where: { inviteToken }
+    })
 
-  if (!invite) throw new Error('Invalid invite token')
-  if (invite.status !== 'pending') throw new Error('Invite already used or expired')
-  if (invite.partner1Id === userId) throw new Error('Cannot link with yourself')
+    if (!invite) throw new Error('Invalid invite token')
+    if (invite.status !== 'pending') throw new Error('Invite already used or expired')
+    if (invite.partner1Id === userId) throw new Error('Cannot link with yourself')
 
-  return db.couple.update({
-    where: { id: invite.id },
-    data: {
-      partner2Id: userId,
-      status: 'active'
-    }
+    // 1. Create the shared profile
+    const sharedProfile = await tx.profile.create({
+      data: {
+        isCouple: true,
+        displayName: 'New Couple',
+        accountType: 'COUPLE'
+      }
+    })
+
+    // 2. Link the couple and activate
+    return tx.couple.update({
+      where: { id: invite.id },
+      data: {
+        partner2Id: userId,
+        status: 'active',
+        profileId: sharedProfile.id
+      }
+    })
   })
 }
 
