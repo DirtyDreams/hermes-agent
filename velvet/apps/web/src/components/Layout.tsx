@@ -1,10 +1,20 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Sparkles, MessageCircle, User, Heart, LogOut } from 'lucide-react'
+import { Sparkles, MessageCircle, User, Heart, Coins, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '../lib/api'
 
 export default function Layout() {
   const logout = useAuthStore((state) => state.logout)
   const navigate = useNavigate()
+
+  const { data: balanceData } = useQuery({
+    queryKey: ['balance'],
+    queryFn: async () => {
+      const { data } = await api.get('/economy/balance')
+      return data
+    }
+  })
 
   const handleLogout = () => {
     logout()
@@ -31,6 +41,18 @@ export default function Layout() {
             <Link to="/" className="nav-link"><Sparkles size={20} /> <span className="hide-mobile">Feed</span></Link>
             <Link to="/conversations" className="nav-link"><MessageCircle size={20} /> <span className="hide-mobile">Chat</span></Link>
             <Link to="/couple/portal" className="nav-link"><Heart size={20} /> <span className="hide-mobile">Relationship</span></Link>
+            <Link to="/economy" className="nav-link" style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.5rem',
+              backgroundColor: 'hsla(var(--primary), 0.1)',
+              padding: '0.4rem 0.75rem',
+              borderRadius: '2rem',
+              color: 'hsl(var(--primary))'
+            }}>
+              <Coins size={18} /> 
+              <span style={{ fontWeight: 800 }}>{balanceData?.balance ?? 0}</span>
+            </Link>
             <Link to="/onboarding" className="nav-link"><User size={20} /> <span className="hide-mobile">Me</span></Link>
           </nav>
 

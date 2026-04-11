@@ -1,5 +1,6 @@
 import { db } from '../../lib/db.js'
 import type { UpdateProfileInput } from '@velvet/shared'
+import { spendCredits } from '../economy/economy.service.js'
 
 export async function getProfile(profileId: string) {
   return db.profile.findUniqueOrThrow({
@@ -40,4 +41,29 @@ export async function updateProfile(userId: string, input: UpdateProfileInput) {
   }
 
   return updated
+}
+
+export async function unlockProfile(userId: string, targetProfileId: string) {
+  const UNLOCK_COST = 50
+
+  return db.$transaction(async (tx) => {
+    // 1. Check if already unlocked
+    const existing = await tx.profileUnlock.findUnique({
+      where: {
+        userId_targetId: { userId, targetId: targetProfileId }
+      }
+    })
+    if (existing) return existing
+
+    // 2. Spend credits
+    await spendCredits(userId, UNLOCK_COST, 'BOOST' as any) // Reusing BOOST type for now
+
+    // 3. Create unlock record
+    return tx.profileUnlock.create({
+      data: {
+        userId,
+        targetId: targetProfileId
+      }
+    })
+  })
 }

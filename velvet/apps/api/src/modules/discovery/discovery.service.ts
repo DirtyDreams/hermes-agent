@@ -44,6 +44,7 @@ export async function getDiscoveryFeed({ userId, page = 1, limit = 20, filters =
     },
     include: {
       photos: { where: { purpose: 'profile_photo' }, orderBy: { order: 'asc' }, take: 3 },
+      unlockedBy: { where: { userId } }
     },
     skip,
     take: limit,

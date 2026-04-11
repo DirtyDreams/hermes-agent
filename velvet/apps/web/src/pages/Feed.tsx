@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
 import { api } from '../lib/api'
-import { Heart, X, MapPin } from 'lucide-react'
+import { Heart, X, MapPin, Zap, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 
 export default function Feed() {
+  const queryClient = useQueryClient()
   const { data: profiles, isLoading, refetch } = useQuery({
     queryKey: ['feed'],
     queryFn: async () => {
@@ -14,6 +16,7 @@ export default function Feed() {
   })
 
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [unmasking, setUnmasking] = useState(false)
 
   const handleVibe = async (profileId: string, type: 'like' | 'dislike') => {
     try {
@@ -24,15 +27,29 @@ export default function Feed() {
     }
   }
 
+  const handleUnmask = async (profileId: string) => {
+    setUnmasking(true)
+    try {
+      await api.post(`/profiles/${profileId}/unlock`)
+      await queryClient.invalidateQueries({ queryKey: ['feed'] })
+      await queryClient.invalidateQueries({ queryKey: ['balance'] })
+    } catch (err) {
+      console.error('Unmask failed', err)
+    } finally {
+      setUnmasking(false)
+    }
+  }
+
   if (isLoading) return <div className="text-center py-20">Loading Discovery Feed...</div>
-  if (!profiles || profiles.length <= currentIndex) return (
+  const currentProfile = profiles?.[currentIndex]
+  if (!profiles || profiles.length <= currentIndex || !currentProfile) return (
     <div className="text-center py-20">
       <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>You've seen everyone nearby!</h2>
       <p className="label">Check back later or change your filters.</p>
     </div>
   )
 
-  const currentProfile = profiles[currentIndex]
+  const isUnlocked = currentProfile.unlockedBy?.length > 0
 
   return (
     <div style={{ maxWidth: '450px', margin: '0 auto' }}>
@@ -54,8 +71,41 @@ export default function Feed() {
             <img 
               src={currentProfile.photos?.[0]?.cdnUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=450&h=600&auto=format&fit=crop'} 
               alt={currentProfile.displayName}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'cover',
+                filter: isUnlocked ? 'none' : 'blur(40px)',
+                transition: 'filter 0.5s ease'
+              }}
             />
+            
+            {!isUnlocked && (
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <button 
+                   onClick={() => handleUnmask(currentProfile.id)}
+                   disabled={unmasking}
+                   className="btn" 
+                   style={{ 
+                     backgroundColor: 'rgba(255,255,255,0.1)', 
+                     backdropFilter: 'blur(8px)',
+                     border: '1px solid rgba(255,255,255,0.2)',
+                     color: 'white',
+                     height: 'auto',
+                     padding: '1rem 2rem',
+                     borderRadius: '50rem',
+                     display: 'flex',
+                     alignItems: 'center',
+                     gap: '1rem',
+                     fontWeight: 700
+                   }}
+                >
+                  {unmasking ? <RefreshCw className="animate-spin" size={20} /> : <Zap size={20} fill="currentColor" />}
+                  Unmask Identity (50)
+                </button>
+              </div>
+            )}
+
             <div style={{ 
               position: 'absolute', 
               bottom: 0, 
@@ -68,9 +118,6 @@ export default function Feed() {
               <h2 style={{ fontSize: '2rem', margin: 0 }}>{currentProfile.displayName}, {currentProfile.age}</h2>
               <p style={{ opacity: 0.8, display: 'flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.25rem' }}>
                 <MapPin size={16} /> {currentProfile.locationCity}
-              </p>
-              <p style={{ marginTop: '1rem', lineClamp: 3, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                {currentProfile.bio}
               </p>
             </div>
           </div>

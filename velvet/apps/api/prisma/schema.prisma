@@ -31,6 +31,7 @@ model User {
   sentMessages Message[]
   coupleAsP1  Couple?   @relation("CouplePartner1")
   coupleAsP2  Couple?   @relation("CouplePartner2")
+  profileUnlocks ProfileUnlock[]
 }
 
 model Session {
@@ -70,6 +71,7 @@ model Profile {
   user   User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   photos MediaFile[]
   coupleProfile Couple? @relation("CoupleSharedProfile")
+  unlockedBy ProfileUnlock[] @relation("ProfileUnlocks")
 }
 
 model Couple {
@@ -173,6 +175,18 @@ model Event {
   status               String   @default("published")
   externalUrl          String?
   createdAt            DateTime @default(now())
+}
+
+model ProfileUnlock {
+  id         String   @id @default(uuid())
+  userId     String
+  targetId   String   // The Profile ID that is unlocked
+  createdAt  DateTime @default(now())
+
+  user       User     @relation(fields: [userId], references: [id])
+  target     Profile  @relation("ProfileUnlocks", fields: [targetId], references: [id])
+
+  @@unique([userId, targetId])
 }
 
 model CreditTransaction {

@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify'
 import { UpdateProfileSchema } from '@velvet/shared'
-import { getProfile, getProfileByUserId, updateProfile } from './profiles.service.js'
+import { getProfile, getProfileByUserId, updateProfile, unlockProfile } from './profiles.service.js'
 import { generatePartnerInvite, acceptPartnerInvite } from './couple.service.js'
 
 export default async function profileRoutes(app: FastifyInstance) {
@@ -41,6 +41,16 @@ export default async function profileRoutes(app: FastifyInstance) {
     } catch (err: any) {
       if (err.statusCode) return reply.status(err.statusCode).send({ status: 'error', message: err.message })
       throw err
+    }
+  })
+
+  app.post('/:id/unlock', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const { id } = request.params as { id: string }
+      const res = await unlockProfile(request.user.sub, id)
+      return reply.send({ status: 'success', data: res })
+    } catch (err: any) {
+      return reply.status(400).send({ status: 'error', message: err.message })
     }
   })
 
