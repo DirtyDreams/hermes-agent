@@ -19,6 +19,8 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
+  publicKey       String?   // RSA Public Key for E2EE
+  credits         Int       @default(0)
 
   profile     Profile?
   sessions    Session[]
@@ -47,6 +49,8 @@ model Profile {
   id                 String   @id @default(uuid())
   userId             String   @unique
   displayName        String?
+  nickname           String?  @unique
+  accountType        String   @default("MAN")
   bio                String?
   dateOfBirth        DateTime?
   locationCity       String?
@@ -169,4 +173,13 @@ model Event {
   status               String   @default("published")
   externalUrl          String?
   createdAt            DateTime @default(now())
+}
+
+model CreditTransaction {
+  id        String   @id @default(uuid())
+  userId    String
+  amount    Int
+  type      String   // TOPUP, SPEND, TIP
+  reason    String?
+  createdAt DateTime @default(now())
 }
