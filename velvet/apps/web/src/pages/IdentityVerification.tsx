@@ -8,12 +8,22 @@ export default function IdentityVerification() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
-  const simulateProcess = () => {
+  const simulateProcess = async () => {
     setLoading(true)
-    setTimeout(() => {
+    try {
+      // In a real app we'd upload the file first
+      const mockPhotoUrl = 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&h=400&auto=format&fit=crop'
+      
+      await api.post('/profiles/verify', { photoUrl: mockPhotoUrl })
+      
+      setTimeout(() => {
+        setLoading(false)
+        setSuccess(true)
+      }, 2500)
+    } catch (err) {
+      console.error('Verification failed', err)
       setLoading(false)
-      setSuccess(true)
-    }, 3000)
+    }
   }
 
   return (

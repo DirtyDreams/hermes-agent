@@ -64,4 +64,23 @@ export default async function profileRoutes(app: FastifyInstance) {
       return reply.status(404).send({ status: 'error', message: 'Profile not found' })
     }
   })
+
+  app.post('/verify', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const { photoUrl } = request.body as { photoUrl: string }
+      const { db } = await import('../../lib/db.js')
+      
+      await db.profile.update({
+        where: { userId: request.user.sub },
+        data: {
+          verificationStatus: 'pending',
+          verificationPhoto: photoUrl
+        }
+      })
+
+      return reply.send({ status: 'success', message: 'Verification request submitted' })
+    } catch (err: any) {
+      return reply.status(500).send({ status: 'error', message: err.message })
+    }
+  })
 }
