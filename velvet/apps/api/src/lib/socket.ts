@@ -3,6 +3,7 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { redis } from './redis.js'
 import { db } from './db.js'
 import { saveMessage } from '../modules/messaging/messaging.service.js'
+import { presenceService } from '../modules/presence/presence.service.js'
 import Redis from 'ioredis'
 import type { FastifyInstance } from 'fastify'
 
@@ -39,11 +40,13 @@ export async function setupSocketIO(app: FastifyInstance) {
     }
   })
 
-  io.on('connection', (socket) => {
+  io.on('connection', async (socket) => {
     const userId = (socket as any).userId
     app.log.info({ userId, socketId: socket.id }, 'Socket connected')
 
     socket.join(userId)
+    await presenceService.setUserOnline(userId)
+    io.emit('presence:update', { userId, status: 'online' })
 
     socket.on('message:send', async (data: { 
       conversationId?: string, 
@@ -103,6 +106,24 @@ export async function setupSocketIO(app: FastifyInstance) {
       }
     })
 
+    socket.on('chat:typing_start', (data: { conversationId?: string, roomId?: string }) => {
+      const targetId = data.roomId || data.conversationId
+      if (targetId) {
+        socket.to(targetId).emit('chat:typing_start', { userId, ...data })
+      }
+    })
+
+    socket.on('chat:typing_stop', (data: { conversationId?: string, roomId?: string }) => {
+      const targetId = data.roomId || data.conversationId
+      if (targetId) {
+        socket.to(targetId).emit('chat:typing_stop', { userId, ...data })
+      }
+    })
+
+    socket.on('heartbeat', async () => {
+      await presenceService.setUserOnline(userId)
+    })
+
     socket.on('shout:post', async (data: { content: string }) => {
       // Broadcast to everyone for the global board
       io.emit('shout:new', {
@@ -114,7 +135,9 @@ export async function setupSocketIO(app: FastifyInstance) {
       })
     })
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
+      await presenceService.setUserOffline(userId)
+      io.emit('presence:update', { userId, status: 'offline' })
       app.log.info({ userId, socketId: socket.id }, 'Socket disconnected')
     })
   })
