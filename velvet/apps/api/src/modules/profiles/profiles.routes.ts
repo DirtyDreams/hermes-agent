@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify'
 import { UpdateProfileSchema } from '@velvet/shared'
 import { getProfile, getProfileByUserId, updateProfile } from './profiles.service.js'
+import { generatePartnerInvite, acceptPartnerInvite } from './couple.service.js'
 
 export default async function profileRoutes(app: FastifyInstance) {
-  // Get own profile
+  // ... (previous routes)
   app.get('/me', { onRequest: [app.authenticate] }, async (request: any, reply) => {
     try {
       const profile = await getProfileByUserId(request.user.sub)
@@ -13,7 +14,6 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
   })
 
-  // Update own profile
   app.patch('/me', { onRequest: [app.authenticate] }, async (request: any, reply) => {
     try {
       const result = UpdateProfileSchema.safeParse(request.body)
@@ -27,12 +27,27 @@ export default async function profileRoutes(app: FastifyInstance) {
     }
   })
 
-  // View any profile by ID (public fields only)
+  app.post('/partner/invite', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    const result = await generatePartnerInvite(request.user.sub)
+    return reply.send(result)
+  })
+
+  app.post('/partner/accept', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const { token } = request.body as { token: string }
+      if (!token) return reply.status(400).send({ status: 'error', message: 'Token required' })
+      const result = await acceptPartnerInvite(request.user.sub, token)
+      return reply.send(result)
+    } catch (err: any) {
+      if (err.statusCode) return reply.status(err.statusCode).send({ status: 'error', message: err.message })
+      throw err
+    }
+  })
+
   app.get('/:id', { onRequest: [app.authenticate] }, async (request: any, reply) => {
     try {
       const { id } = request.params as { id: string }
       const profile = await getProfile(id)
-      // Return only public-safe fields (MVP logic: exclude sensitive metadata)
       const { verificationPhoto, ...safe } = profile as any
       return reply.send(safe)
     } catch (err: any) {
