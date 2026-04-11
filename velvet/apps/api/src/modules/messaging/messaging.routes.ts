@@ -4,6 +4,7 @@ import {
   getMessages,
   exchangePublicKey,
   unmaskConversation,
+  saveMessage,
 } from './messaging.service.js'
 
 export default async function messagingRoutes(app: FastifyInstance) {
@@ -48,6 +49,25 @@ export default async function messagingRoutes(app: FastifyInstance) {
     } catch (err: any) {
       if (err.statusCode) return reply.status(err.statusCode).send({ status: 'error', message: err.message })
       throw err
+    }
+  })
+
+  app.post('/:id/messages', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    const { id } = request.params as { id: string }
+    const { content, nonce, contentType } = request.body as { content: string, nonce: string, contentType?: string }
+    
+    try {
+      const message = await saveMessage(id, request.user.sub, content, nonce, contentType)
+      
+      // Notify other participants via Socket.io if available
+      if (app.io) {
+        // We'd find the other participant and emit to their room
+        // This is partially handled by the socket:send event in socket.ts
+      }
+
+      return reply.send(message)
+    } catch (err: any) {
+      return reply.status(500).send({ status: 'error', message: err.message })
     }
   })
 }

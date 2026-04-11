@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { Link } from 'react-router-dom'
-import { MessageSquare, Shield } from 'lucide-react'
+import { MessageSquare, Shield, Lock } from 'lucide-react'
 
 export default function Conversations() {
   const { data: convs, isLoading } = useQuery({
@@ -31,31 +31,59 @@ export default function Conversations() {
           </div>
         ) : (
           convs.map((c: any) => {
-            const partner = c.participants[0] // Simplified for MVP
+            const currentUserId = sessionStorage.getItem('velvet_user_id')
+            const isUserA = c.match.userAId === currentUserId
+            const partner = isUserA ? c.match.userB : c.match.userA
+            const isPartnerUnmasked = isUserA ? c.isUnmaskedB : c.isUnmaskedA
+            const lastMsg = c.messages?.[0]
+
             return (
               <Link 
                 key={c.id} 
                 to={`/chat/${c.id}`} 
+                className="auth-card"
                 style={{ 
                   textDecoration: 'none', 
-                  backgroundColor: 'hsl(var(--card))', 
                   padding: '1.25rem', 
-                  borderRadius: '1rem', 
-                  border: '1px solid hsl(var(--border) / 0.5)',
+                  borderRadius: '1.25rem', 
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '1rem',
-                  transition: 'transform 0.2s'
+                  gap: '1.25rem',
+                  marginBottom: '1rem'
                 }}
-                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
-                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                <div style={{ width: '3.5rem', height: '3.5rem', borderRadius: '50rem', backgroundColor: 'hsl(var(--secondary))', overflow: 'hidden' }}>
-                  <img src={partner?.profile?.photos?.[0]?.cdnUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ position: 'relative', width: '3.5rem', height: '3.5rem' }}>
+                  <div style={{ 
+                    width: '100%', 
+                    height: '100%', 
+                    borderRadius: '50rem', 
+                    backgroundColor: 'hsl(var(--secondary))', 
+                    overflow: 'hidden',
+                    filter: isPartnerUnmasked ? 'none' : 'blur(4px)'
+                  }}>
+                    {partner?.profile?.photos?.[0]?.cdnUrl && (
+                      <img src={partner.profile.photos[0].cdnUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    )}
+                  </div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <h3 style={{ margin: 0, color: 'white' }}>{partner?.profile?.displayName || 'Velvet Partner'}</h3>
-                  <p className="label" style={{ margin: 0, fontSize: '0.875rem' }}>Click to unmask and chat...</p>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <h3 style={{ margin: 0, color: 'white', fontSize: '1.125rem' }}>
+                      {isPartnerUnmasked ? partner?.profile?.displayName : 'Incognito Partner'}
+                    </h3>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.5 }}>
+                      {lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                  <p className="label" style={{ margin: 0, fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {lastMsg ? (
+                      <>
+                        <Lock size={12} /> Encrypted message
+                      </>
+                    ) : (
+                      'Tap to open secure channel'
+                    )}
+                  </p>
                 </div>
               </Link>
             )

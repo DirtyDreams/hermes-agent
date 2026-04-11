@@ -33,10 +33,21 @@ export default function Chat() {
 
   useEffect(() => {
     const start = async () => {
-      await initialize()
+      // 1. Initialize E2E Identity
+      const keys = await initialize()
       setIsReady(true)
 
-      // Connect socket
+      // 2. Register Public Key if not already set (Simplified for MVP)
+      if (conversation) {
+        const isParticipantA = conversation.match.userAId === sessionStorage.getItem('velvet_user_id')
+        const currentKey = isParticipantA ? conversation.keyA : conversation.keyB
+        
+        if (!currentKey || currentKey !== keys.publicKey) {
+          await api.post(`/conversations/${id}/keys`, { publicKey: keys.publicKey })
+        }
+      }
+
+      // 3. Connect socket
       socketRef.current = io('http://localhost:3000', {
         withCredentials: true,
         extraHeaders: {
@@ -44,23 +55,22 @@ export default function Chat() {
         }
       })
 
-      socketRef.current.emit('join:room', id)
-
-      socketRef.current.on('message:new', async (msg) => {
+      socketRef.current.on('message:receive', async (msg) => {
         try {
-          // In a real app, we'd get the sender's public key from the message or conversation object
-          // For MVP, we use the participant's key. 
-          // Note: In a real system, we'd need a way to know which participant it is.
-          const senderPk = conversation?.keyA || conversation?.keyB // Highly simplified
+          // Identify sender PK
+          const senderPk = msg.senderId === conversation?.match?.userAId 
+            ? conversation?.keyA 
+            : conversation?.keyB
+
           if (senderPk) {
-            const decrypted = await decryptMessage(msg.content, msg.nonce, senderPk)
+            const decrypted = await decryptMessage(msg.encryptedContent, msg.nonce, senderPk)
             setMessages(prev => [...prev, { ...msg, content: decrypted }])
           } else {
-            setMessages(prev => [...prev, msg])
+            setMessages(prev => [...prev, { ...msg, content: '[Encrypted Channel Unstable]' }])
           }
         } catch (err) {
           console.error('Decryption failed', err)
-          setMessages(prev => [...prev, { ...msg, content: '[Encrypted Message]' }])
+          setMessages(prev => [...prev, { ...msg, content: '[Decryption Error]' }])
         }
       })
     }
