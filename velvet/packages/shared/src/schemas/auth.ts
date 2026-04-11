@@ -7,6 +7,9 @@ export const RegisterSchema = z.object({
   dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), {
     message: "Invalid date format",
   }),
+  accountType: z.enum(['MAN', 'WOMAN', 'COUPLE', 'TRANS', 'NON_BINARY']),
+  nickname: z.string().min(3).max(30),
+  publicKey: z.string(),
 })
 
 export const LoginSchema = z.object({
