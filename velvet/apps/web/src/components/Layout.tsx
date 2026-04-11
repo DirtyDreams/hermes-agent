@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Sparkles, MessageCircle, User, Heart, Coins, LogOut } from 'lucide-react'
+import { Sparkles, MessageCircle, User, Heart, Coins, LogOut, Compass } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
@@ -38,7 +38,8 @@ export default function Layout() {
           </Link>
 
           <nav style={{ display: 'flex', gap: '2rem' }}>
-            <Link to="/" className="nav-link"><Sparkles size={20} /> <span className="hide-mobile">Feed</span></Link>
+            <Link to="/" className="nav-link"><Sparkles size={20} /> <span className="hide-mobile">Home</span></Link>
+            <Link to="/discovery" className="nav-link"><Compass size={20} /> <span className="hide-mobile">Discover</span></Link>
             <Link to="/conversations" className="nav-link"><MessageCircle size={20} /> <span className="hide-mobile">Chat</span></Link>
             <Link to="/couple/portal" className="nav-link"><Heart size={20} /> <span className="hide-mobile">Relationship</span></Link>
             <Link to="/economy" className="nav-link" style={{ 

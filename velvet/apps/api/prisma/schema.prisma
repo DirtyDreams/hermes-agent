@@ -23,6 +23,8 @@ model User {
   credits         Int       @default(0)
 
   profile     Profile?
+  posts       Post[]    @relation("UserPosts")
+  reactions   PostReaction[]
   sessions    Session[]
   sentVibes   Vibe[]    @relation("VibeSender")
   receivedVibes Vibe[]  @relation("VibeReceiver")
@@ -52,8 +54,20 @@ model Profile {
   displayName        String?
   nickname           String?  @unique
   accountType        String   @default("MAN")
-  bio                String?
   dateOfBirth        DateTime?
+  bio                String?
+  bannerUrl          String?
+  
+  // Partner 1 Stats
+  ageP1              Int?
+  genderP1           String?
+  orientationP1      String?
+  
+  // Partner 2 Stats (for Couples)
+  ageP2              Int?
+  genderP2           String?
+  orientationP2      String?
+
   locationCity       String?
   locationLat        Float?
   locationLng        Float?
@@ -196,4 +210,30 @@ model CreditTransaction {
   type      String   // TOPUP, SPEND, TIP
   reason    String?
   createdAt DateTime @default(now())
+}
+
+model Post {
+  id          String   @id @default(uuid())
+  authorId    String
+  content     String
+  mediaKeys   String[]
+  visibility  String   @default("PUBLIC") // PUBLIC | UNLOCKED_ONLY | DRAFT
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author      User     @relation("UserPosts", fields: [authorId], references: [id])
+  reactions   PostReaction[]
+}
+
+model PostReaction {
+  id        String   @id @default(uuid())
+  postId    String
+  userId    String
+  type      String   // LIKE, LOVE, WOW
+  createdAt DateTime @default(now())
+
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([postId, userId])
 }

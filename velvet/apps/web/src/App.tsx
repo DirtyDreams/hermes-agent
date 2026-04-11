@@ -3,11 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useAuthStore } from './store/auth'
 import Login from './pages/Login'
 import Register from './pages/Register'
-import Feed from './pages/Feed'
+import HomeTimeline from './pages/HomeTimeline'
+import DiscoveryFeed from './pages/DiscoveryFeed'
 import Conversations from './pages/Conversations'
 import Chat from './pages/Chat'
 import Onboarding from './pages/Onboarding'
 import LiveBoard from './pages/LiveBoard'
+import ProfileView from './pages/ProfileView'
 import CoupleInvite from './pages/CoupleInvite'
 import CouplePortal from './pages/CouplePortal'
 import EconomyDashboard from './pages/EconomyDashboard'
@@ -34,7 +36,8 @@ export default function App() {
               <Layout />
             </ProtectedRoute>
           }>
-            <Route index element={<Feed />} />
+            <Route index element={<HomeTimeline />} />
+            <Route path="discovery" element={<DiscoveryFeed />} />
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="board" element={<LiveBoard />} />
             <Route path="couple/invite" element={<CoupleInvite />} />
@@ -43,6 +46,7 @@ export default function App() {
             <Route path="verify" element={<IdentityVerification />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="chat/:id" element={<Chat />} />
+            <Route path="profile/:userId" element={<ProfileView />} />
           </Route>
         </Routes>
       </BrowserRouter>

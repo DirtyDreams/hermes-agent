@@ -2,9 +2,9 @@ import { FastifyInstance } from 'fastify'
 import { UpdateProfileSchema } from '@velvet/shared'
 import { getProfile, getProfileByUserId, updateProfile, unlockProfile } from './profiles.service.js'
 import { generatePartnerInvite, acceptPartnerInvite } from './couple.service.js'
+import { HttpError, listPostsForProfile } from '../posts/posts.service.js'
 
 export default async function profileRoutes(app: FastifyInstance) {
-  // ... (previous routes)
   app.get('/me', { onRequest: [app.authenticate] }, async (request: any, reply) => {
     try {
       const profile = await getProfileByUserId(request.user.sub)
@@ -51,6 +51,23 @@ export default async function profileRoutes(app: FastifyInstance) {
       return reply.send({ status: 'success', data: res })
     } catch (err: any) {
       return reply.status(400).send({ status: 'error', message: err.message })
+    }
+  })
+
+  app.get('/:id/posts', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const { id } = request.params as { id: string }
+      const { cursor, limit } = request.query as { cursor?: string; limit?: string }
+      const result = await listPostsForProfile(id, request.user.sub, {
+        cursor,
+        limit: limit ? parseInt(limit, 10) : undefined,
+      })
+      return reply.send(result)
+    } catch (err: any) {
+      if (err instanceof HttpError) {
+        return reply.status(err.statusCode).send({ status: 'error', message: err.message })
+      }
+      throw err
     }
   })
 
