@@ -40,9 +40,12 @@ export function buildApp() {
 
   // Routes
   app.register(import('./modules/auth/auth.routes.js'), { prefix: '/api/v1/auth' })
+  app.register(import('./modules/users/users.routes.js'), { prefix: '/api/v1/users' })
   app.register(import('./modules/profiles/profiles.routes.js'), { prefix: '/api/v1/profiles' })
   app.register(import('./modules/discovery/discovery.routes.js'), { prefix: '/api/v1/discovery' })
   app.register(import('./modules/messaging/messaging.routes.js'), { prefix: '/api/v1/conversations' })
+  app.register(import('./modules/events/events.routes.js'), { prefix: '/api/v1/events' })
+  app.register(import('./modules/media/media.routes.js'), { prefix: '/api/v1/media' })
 
   return app
 }

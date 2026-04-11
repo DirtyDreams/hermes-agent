@@ -3,8 +3,10 @@ import { z } from 'zod'
 export const RegisterSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(100),
-  phone: z.string().min(10).max(15),
-  dateOfBirth: z.string().datetime(), // ISO string
+  phone: z.string().min(8).max(20),
+  dateOfBirth: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Invalid date format",
+  }),
 })
 
 export const LoginSchema = z.object({

@@ -14,5 +14,8 @@
   },
   "dependencies": {
     "bcrypt": "^6.0.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.8.9"
   }
 }

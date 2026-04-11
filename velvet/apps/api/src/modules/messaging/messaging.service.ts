@@ -72,3 +72,32 @@ export async function saveMessage(
     data: { conversationId, senderId, encryptedContent, nonce, contentType },
   })
 }
+
+export async function unmaskConversation(conversationId: string, userId: string) {
+  const conversation = await db.conversation.findUniqueOrThrow({
+    where: { id: conversationId },
+    include: { match: true },
+  })
+
+  const { userAId, userBId } = conversation.match
+  if (userId !== userAId && userId !== userBId) {
+    const error: any = new Error('Forbidden')
+    error.statusCode = 403
+    throw error
+  }
+
+  const update = userId === userAId ? { isUnmaskedA: true } : { isUnmaskedB: true }
+  
+  return db.conversation.update({
+    where: { id: conversationId },
+    data: update,
+    include: {
+      match: {
+        include: {
+          userA: { select: { profile: true } },
+          userB: { select: { profile: true } },
+        }
+      }
+    }
+  })
+}

@@ -3,11 +3,18 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { redis } from './redis.js'
 import { db } from './db.js'
 import { saveMessage } from '../modules/messaging/messaging.service.js'
+import Redis from 'ioredis'
 import type { FastifyInstance } from 'fastify'
 
 export async function setupSocketIO(app: FastifyInstance) {
-  const pubClient = redis.duplicate()
-  const subClient = redis.duplicate()
+  const pubClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+    lazyConnect: true
+  })
+  const subClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+    lazyConnect: true
+  })
   await Promise.all([pubClient.connect(), subClient.connect()])
 
   const io = new SocketServer(app.server, {

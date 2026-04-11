@@ -132,6 +132,8 @@ model Conversation {
   matchId   String   @unique
   keyA      String?
   keyB      String?
+  isUnmaskedA Boolean @default(false)
+  isUnmaskedB Boolean @default(false)
   createdAt DateTime @default(now())
 
   match    Match     @relation(fields: [matchId], references: [id])
