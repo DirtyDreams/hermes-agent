@@ -46,6 +46,7 @@ export function buildApp() {
   app.register(import('./modules/messaging/messaging.routes.js'), { prefix: '/api/v1/conversations' })
   app.register(import('./modules/events/events.routes.js'), { prefix: '/api/v1/events' })
   app.register(import('./modules/media/media.routes.js'), { prefix: '/api/v1/media' })
+  app.register(import('./modules/couples/couples.routes.js'), { prefix: '/api/v1/couples' })
 
   return app
 }
