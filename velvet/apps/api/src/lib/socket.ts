@@ -73,6 +73,17 @@ export async function setupSocketIO(app: FastifyInstance) {
       }
     })
 
+    socket.on('shout:post', async (data: { content: string }) => {
+      // Broadcast to everyone for the global board
+      io.emit('shout:new', {
+        id: Math.random().toString(36).substr(2, 9),
+        content: data.content,
+        userId: userId,
+        nickname: 'Anonymous', // In production we'd fetch from DB
+        timestamp: new Date().toISOString()
+      })
+    })
+
     socket.on('disconnect', () => {
       app.log.info({ userId, socketId: socket.id }, 'Socket disconnected')
     })
