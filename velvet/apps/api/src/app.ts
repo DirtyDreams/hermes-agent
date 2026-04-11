@@ -40,6 +40,7 @@ export function buildApp() {
 
   // Routes
   app.register(import('./modules/auth/auth.routes.js'), { prefix: '/api/v1/auth' })
+  app.register(import('./modules/profiles/profiles.routes.js'), { prefix: '/api/v1/profiles' })
 
   return app
 }
