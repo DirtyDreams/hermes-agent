@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { Heart, X, MapPin, Zap, RefreshCw } from 'lucide-react'
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
 
 export default function DiscoveryFeed() {
   const queryClient = useQueryClient()
@@ -19,9 +19,12 @@ export default function DiscoveryFeed() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [unmasking, setUnmasking] = useState(false)
 
-  const handleVibe = async (targetUserId: string, type: 'like' | 'pass') => {
+  const handleVibe = async (targetUserId: string, type: 'like' | 'dislike') => {
     try {
-      await api.post('/discovery/vibe', { targetId: targetUserId, type })
+      await api.post('/discovery/vibe', {
+        targetId: targetUserId,
+        type: type === 'like' ? 'like' : 'pass',
+      })
       setCurrentIndex((prev) => prev + 1)
     } catch (err) {
       console.error('Vibe failed', err)
@@ -52,7 +55,6 @@ export default function DiscoveryFeed() {
     )
 
   const isUnlocked = currentProfile.unlockedBy?.length > 0
-  const targetUserId = currentProfile.userId ?? currentProfile.user?.id
 
   return (
     <div style={{ maxWidth: '450px', margin: '0 auto' }}>
@@ -144,7 +146,7 @@ export default function DiscoveryFeed() {
 
           <div style={{ display: 'flex', padding: '1.5rem', gap: '1rem' }}>
             <button
-              onClick={() => targetUserId && handleVibe(targetUserId, 'pass')}
+              onClick={() => handleVibe(currentProfile.userId, 'dislike')}
               className="btn"
               style={{
                 backgroundColor: 'hsl(var(--secondary))',
@@ -157,7 +159,7 @@ export default function DiscoveryFeed() {
               <X size={28} />
             </button>
             <button
-              onClick={() => targetUserId && handleVibe(targetUserId, 'like')}
+              onClick={() => handleVibe(currentProfile.userId, 'like')}
               className="btn btn-primary"
               style={{ flex: 2, height: '4rem', borderRadius: '50rem' }}
             >

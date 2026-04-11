@@ -1,17 +1,16 @@
-import type { FastifyInstance } from 'fastify'
-import { ZodError } from 'zod'
+import { FastifyInstance } from 'fastify'
 import { PostReactionBodySchema } from '@velvet/shared'
 import {
-  HttpError,
   createPost,
   deletePost,
+  HttpError,
   listTimeline,
   removeReaction,
   setReaction,
   updatePost,
 } from './posts.service.js'
 
-const rateCreate = {
+const writeRateLimit = {
   config: {
     rateLimit: {
       max: 30,
@@ -20,39 +19,17 @@ const rateCreate = {
   },
 }
 
-const rateReact = {
-  config: {
-    rateLimit: {
-      max: 60,
-      timeWindow: '1 minute',
-    },
-  },
-}
-
 export default async function postsRoutes(app: FastifyInstance) {
-  // Static path before /:id so "timeline" is not captured as an id
-  app.get('/timeline', { onRequest: [app.authenticate] }, async (request: any, reply) => {
-    const { cursor, limit } = request.query as { cursor?: string; limit?: string }
-    const result = await listTimeline(request.user.sub, {
-      cursor,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    })
-    return reply.send(result)
-  })
-
   app.post(
     '/',
-    { onRequest: [app.authenticate], ...rateCreate },
+    { onRequest: [app.authenticate], ...writeRateLimit },
     async (request: any, reply) => {
       try {
-        const dto = await createPost(request.user.sub, request.body)
-        return reply.status(201).send(dto)
-      } catch (err: any) {
+        const data = await createPost(request.user.sub, request.body)
+        return reply.send({ data })
+      } catch (err: unknown) {
         if (err instanceof HttpError) {
           return reply.status(err.statusCode).send({ status: 'error', message: err.message })
-        }
-        if (err instanceof ZodError) {
-          return reply.status(400).send({ status: 'error', errors: err.format() })
         }
         throw err
       }
@@ -61,18 +38,15 @@ export default async function postsRoutes(app: FastifyInstance) {
 
   app.patch(
     '/:id',
-    { onRequest: [app.authenticate], ...rateCreate },
+    { onRequest: [app.authenticate], ...writeRateLimit },
     async (request: any, reply) => {
       try {
         const { id } = request.params as { id: string }
-        const dto = await updatePost(request.user.sub, id, request.body)
-        return reply.send(dto)
-      } catch (err: any) {
+        const data = await updatePost(request.user.sub, id, request.body)
+        return reply.send({ data })
+      } catch (err: unknown) {
         if (err instanceof HttpError) {
           return reply.status(err.statusCode).send({ status: 'error', message: err.message })
-        }
-        if (err instanceof ZodError) {
-          return reply.status(400).send({ status: 'error', errors: err.format() })
         }
         throw err
       }
@@ -83,8 +57,27 @@ export default async function postsRoutes(app: FastifyInstance) {
     try {
       const { id } = request.params as { id: string }
       await deletePost(request.user.sub, id)
-      return reply.code(204).send()
-    } catch (err: any) {
+      return reply.status(204).send()
+    } catch (err: unknown) {
+      if (err instanceof HttpError) {
+        return reply.status(err.statusCode).send({ status: 'error', message: err.message })
+      }
+      throw err
+    }
+  })
+
+  app.get('/timeline', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const q = request.query as { cursor?: string; limit?: string }
+      let limit = q.limit ? parseInt(q.limit, 10) : 20
+      if (Number.isNaN(limit) || limit < 1) limit = 20
+      limit = Math.min(limit, 50)
+      const result = await listTimeline(request.user.sub, {
+        cursor: q.cursor,
+        limit,
+      })
+      return reply.send(result)
+    } catch (err: unknown) {
       if (err instanceof HttpError) {
         return reply.status(err.statusCode).send({ status: 'error', message: err.message })
       }
@@ -94,39 +87,35 @@ export default async function postsRoutes(app: FastifyInstance) {
 
   app.post(
     '/:id/reactions',
-    { onRequest: [app.authenticate], ...rateReact },
+    { onRequest: [app.authenticate], ...writeRateLimit },
     async (request: any, reply) => {
       try {
+        const parsed = PostReactionBodySchema.safeParse(request.body)
+        if (!parsed.success) {
+          return reply.status(400).send({ status: 'error', errors: parsed.error.format() })
+        }
         const { id } = request.params as { id: string }
-        const body = PostReactionBodySchema.parse(request.body)
-        const dto = await setReaction(request.user.sub, id, body.type)
-        return reply.send(dto)
-      } catch (err: any) {
+        const data = await setReaction(request.user.sub, id, parsed.data.type)
+        return reply.send({ data })
+      } catch (err: unknown) {
         if (err instanceof HttpError) {
           return reply.status(err.statusCode).send({ status: 'error', message: err.message })
-        }
-        if (err instanceof ZodError) {
-          return reply.status(400).send({ status: 'error', errors: err.format() })
         }
         throw err
       }
     }
   )
 
-  app.delete(
-    '/:id/reactions',
-    { onRequest: [app.authenticate], ...rateReact },
-    async (request: any, reply) => {
-      try {
-        const { id } = request.params as { id: string }
-        await removeReaction(request.user.sub, id)
-        return reply.code(204).send()
-      } catch (err: any) {
-        if (err instanceof HttpError) {
-          return reply.status(err.statusCode).send({ status: 'error', message: err.message })
-        }
-        throw err
+  app.delete('/:id/reactions', { onRequest: [app.authenticate] }, async (request: any, reply) => {
+    try {
+      const { id } = request.params as { id: string }
+      const data = await removeReaction(request.user.sub, id)
+      return reply.send({ data })
+    } catch (err: unknown) {
+      if (err instanceof HttpError) {
+        return reply.status(err.statusCode).send({ status: 'error', message: err.message })
       }
+      throw err
     }
-  )
+  })
 }

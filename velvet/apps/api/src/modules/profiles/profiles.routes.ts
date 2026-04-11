@@ -57,13 +57,16 @@ export default async function profileRoutes(app: FastifyInstance) {
   app.get('/:id/posts', { onRequest: [app.authenticate] }, async (request: any, reply) => {
     try {
       const { id } = request.params as { id: string }
-      const { cursor, limit } = request.query as { cursor?: string; limit?: string }
+      const q = request.query as { cursor?: string; limit?: string }
+      let limit = q.limit ? parseInt(q.limit, 10) : 20
+      if (Number.isNaN(limit) || limit < 1) limit = 20
+      limit = Math.min(limit, 50)
       const result = await listPostsForProfile(id, request.user.sub, {
-        cursor,
-        limit: limit ? parseInt(limit, 10) : undefined,
+        cursor: q.cursor,
+        limit,
       })
       return reply.send(result)
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof HttpError) {
         return reply.status(err.statusCode).send({ status: 'error', message: err.message })
       }

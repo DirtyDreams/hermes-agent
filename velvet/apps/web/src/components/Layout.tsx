@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom'
-import { Sparkles, MessageCircle, User, Heart, Coins, LogOut, Compass } from 'lucide-react'
+import { Sparkles, Compass, MessageCircle, User, Heart, Coins, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/auth'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'

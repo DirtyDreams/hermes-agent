@@ -8,30 +8,54 @@ import {
 import { db } from '../../lib/db.js'
 import { getPublicUrl } from '../../lib/storage.js'
 
+export const MAX_POST_MEDIA = 4
+export type PostAuthorDto = {
+  id: string
+  nickname: string | null
+  displayName: string | null
+  avatarUrl: string | null
+}
+
+export type PostDto = {
+  id: string
+  content: string
+  visibility: string
+  mediaKeys: string[]
+  mediaUrls: string[]
+  createdAt: string
+  updatedAt: string
+  author: PostAuthorDto
+  reactionCounts: Record<string, number>
+  viewerReaction: string | null
+}
+
 export class HttpError extends Error {
-  statusCode: number
-  constructor(statusCode: number, message: string) {
+  constructor(
+    message: string,
+    public statusCode: number
+  ) {
     super(message)
-    this.statusCode = statusCode
+    this.name = 'HttpError'
   }
 }
 
-const MAX_MEDIA = 4
-const POST_MEDIA_PREFIX = (userId: string) => `POST_MEDIA/${userId}/`
+function mediaKeyPrefix(userId: string) {
+  return `POST_MEDIA/${userId}/`
+}
 
 export function validateMediaKeys(authorId: string, keys: string[]) {
-  if (keys.length > MAX_MEDIA) {
-    throw new HttpError(400, `At most ${MAX_MEDIA} media attachments allowed`)
+  if (keys.length > MAX_POST_MEDIA) {
+    throw new HttpError(`At most ${MAX_POST_MEDIA} media attachments`, 400)
   }
-  const prefix = POST_MEDIA_PREFIX(authorId)
+  const prefix = mediaKeyPrefix(authorId)
   for (const key of keys) {
     if (!key.startsWith(prefix)) {
-      throw new HttpError(400, 'Invalid media key for this user')
+      throw new HttpError('Invalid media key for this user', 400)
     }
   }
 }
 
-export async function getUnlockedProfileIds(viewerId: string): Promise<Set<string>> {
+async function getUnlockedProfileIds(viewerId: string): Promise<Set<string>> {
   const rows = await db.profileUnlock.findMany({
     where: { userId: viewerId },
     select: { targetId: true },
@@ -39,38 +63,17 @@ export async function getUnlockedProfileIds(viewerId: string): Promise<Set<strin
   return new Set(rows.map((r) => r.targetId))
 }
 
-type AuthorWithWall = {
-  id: string
-  profile: {
-    id: string
-    nickname: string | null
-    displayName: string | null
-    bannerUrl: string | null
-    photos: { cdnUrl: string }[]
-  } | null
-  coupleAsP1: { profileId: string | null } | null
-  coupleAsP2: { profileId: string | null } | null
-}
-
-function wallProfileIdsForAuthor(author: AuthorWithWall): Set<string> {
-  const s = new Set<string>()
-  if (author.profile?.id) s.add(author.profile.id)
-  if (author.coupleAsP1?.profileId) s.add(author.coupleAsP1.profileId)
-  if (author.coupleAsP2?.profileId) s.add(author.coupleAsP2.profileId)
-  return s
-}
-
 export function timelineWhereForViewer(
   viewerId: string,
   unlocked: Set<string>
 ): Prisma.PostWhereInput {
   const unlockedArr = [...unlocked]
-  const orBranches: Prisma.PostWhereInput[] = [
+  const parts: Prisma.PostWhereInput[] = [
     { authorId: viewerId },
     { visibility: 'PUBLIC' },
   ]
   if (unlockedArr.length > 0) {
-    orBranches.push({
+    parts.push({
       AND: [
         { visibility: 'UNLOCKED_ONLY' },
         {
@@ -83,17 +86,13 @@ export function timelineWhereForViewer(
       ],
     })
   }
-  return { OR: orBranches }
+  return { OR: parts }
 }
 
-const postListInclude = {
+const postInclude = {
   author: {
     include: {
-      profile: {
-        include: {
-          photos: { orderBy: { order: 'asc' as const }, take: 1 },
-        },
-      },
+      profile: { include: { photos: { orderBy: { order: 'asc' as const }, take: 1 } } },
       coupleAsP1: true,
       coupleAsP2: true,
     },
@@ -101,35 +100,23 @@ const postListInclude = {
   reactions: true,
 } satisfies Prisma.PostInclude
 
-type PostList = Prisma.PostGetPayload<{ include: typeof postListInclude }>
+type PostLoaded = Prisma.PostGetPayload<{ include: typeof postInclude }>
 
-export async function canReadPostInTimeline(
-  viewerId: string,
-  post: { authorId: string; visibility: string; author: AuthorWithWall }
-): Promise<boolean> {
-  if (post.authorId === viewerId) return true
-  if (post.visibility === 'DRAFT') return false
-  if (post.visibility === 'PUBLIC') return true
-  if (post.visibility === 'UNLOCKED_ONLY') {
-    const unlocked = await getUnlockedProfileIds(viewerId)
-    for (const id of wallProfileIdsForAuthor(post.author)) {
-      if (unlocked.has(id)) return true
-    }
-    return false
+function reactionCounts(reactions: { type: string }[]): Record<string, number> {
+  const out: Record<string, number> = {}
+  for (const r of reactions) {
+    out[r.type] = (out[r.type] ?? 0) + 1
   }
-  return false
+  return out
 }
 
-export function toPostDto(post: PostList, viewerId: string) {
+export function toPostDto(post: PostLoaded, viewerId: string): PostDto {
   const profile = post.author.profile
-  const avatarUrl = profile?.photos?.[0]?.cdnUrl ?? profile?.bannerUrl ?? null
-  const counts = { LIKE: 0, LOVE: 0, WOW: 0 } as Record<ReactionType, number>
-  let viewerReaction: ReactionType | null = null
-  for (const r of post.reactions) {
-    const t = r.type as ReactionType
-    if (t in counts) counts[t] += 1
-    if (r.userId === viewerId) viewerReaction = t
-  }
+  const avatarUrl = profile?.photos?.[0]?.cdnUrl ?? null
+
+  const viewerReaction =
+    post.reactions.find((r) => r.userId === viewerId)?.type ?? null
+
   return {
     id: post.id,
     content: post.content,
@@ -138,35 +125,52 @@ export function toPostDto(post: PostList, viewerId: string) {
     mediaUrls: post.mediaKeys.map((k) => getPublicUrl(k)),
     createdAt: post.createdAt.toISOString(),
     updatedAt: post.updatedAt.toISOString(),
-    authorId: post.authorId,
     author: {
-      id: post.author.id,
+      id: post.authorId,
       nickname: profile?.nickname ?? null,
       displayName: profile?.displayName ?? null,
       avatarUrl,
     },
-    reactionCounts: { like: counts.LIKE, love: counts.LOVE, wow: counts.WOW },
+    reactionCounts: reactionCounts(post.reactions),
     viewerReaction,
   }
 }
 
+function encodeCursor(createdAt: Date, id: string) {
+  return `${createdAt.toISOString()}|${id}`
+}
+
+function decodeCursor(cursor: string): { createdAt: Date; id: string } {
+  const pipe = cursor.indexOf('|')
+  if (pipe === -1) throw new HttpError('Invalid cursor', 400)
+  const createdAt = new Date(cursor.slice(0, pipe))
+  const id = cursor.slice(pipe + 1)
+  if (Number.isNaN(createdAt.getTime()) || !id) throw new HttpError('Invalid cursor', 400)
+  return { createdAt, id }
+}
+
 export async function createPost(userId: string, body: unknown) {
-  const input = CreatePostSchema.parse(body)
-  try {
-    assertNonEmptyPost(input.content, input.mediaKeys)
-  } catch (e) {
-    if (e instanceof Error) throw new HttpError(400, e.message)
-    throw e
+  const parsed = CreatePostSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new HttpError(JSON.stringify(parsed.error.format()), 400)
   }
-  validateMediaKeys(userId, input.mediaKeys)
+  const { content, visibility, mediaKeys } = parsed.data
+  try {
+    assertNonEmptyPost(content, mediaKeys)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Invalid post'
+    throw new HttpError(msg, 400)
+  }
+  validateMediaKeys(userId, mediaKeys)
+
   const post = await db.post.create({
     data: {
       authorId: userId,
-      content: input.content.trim(),
-      visibility: input.visibility,
-      mediaKeys: input.mediaKeys,
+      content,
+      visibility,
+      mediaKeys,
     },
-    include: postListInclude,
+    include: postInclude,
   })
   return toPostDto(post, userId)
 }
@@ -174,30 +178,37 @@ export async function createPost(userId: string, body: unknown) {
 export async function updatePost(userId: string, postId: string, body: unknown) {
   const existing = await db.post.findUnique({ where: { id: postId } })
   if (!existing || existing.authorId !== userId) {
-    throw new HttpError(404, 'Post not found')
+    throw new HttpError('Post not found', 404)
   }
-  const input = UpdatePostSchema.parse(body)
-  if (
-    input.content === undefined &&
-    input.visibility === undefined &&
-    input.mediaKeys === undefined
-  ) {
-    throw new HttpError(400, 'No fields to update')
+
+  const parsed = UpdatePostSchema.safeParse(body)
+  if (!parsed.success) {
+    throw new HttpError(JSON.stringify(parsed.error.format()), 400)
   }
-  const content = input.content !== undefined ? input.content.trim() : existing.content
-  const visibility = input.visibility ?? existing.visibility
-  const mediaKeys = input.mediaKeys ?? existing.mediaKeys
+  const patch = parsed.data
+
+  const nextContent = patch.content ?? existing.content
+  const nextVisibility = patch.visibility ?? existing.visibility
+  const nextKeys = patch.mediaKeys !== undefined ? patch.mediaKeys : existing.mediaKeys
+
   try {
-    assertNonEmptyPost(content, mediaKeys)
+    assertNonEmptyPost(nextContent, nextKeys)
   } catch (e) {
-    if (e instanceof Error) throw new HttpError(400, e.message)
-    throw e
+    const msg = e instanceof Error ? e.message : 'Invalid post'
+    throw new HttpError(msg, 400)
   }
-  validateMediaKeys(userId, mediaKeys)
+  if (patch.mediaKeys !== undefined) {
+    validateMediaKeys(userId, nextKeys)
+  }
+
   const post = await db.post.update({
     where: { id: postId },
-    data: { content, visibility, mediaKeys },
-    include: postListInclude,
+    data: {
+      ...(patch.content !== undefined ? { content: patch.content } : {}),
+      ...(patch.visibility !== undefined ? { visibility: patch.visibility } : {}),
+      ...(patch.mediaKeys !== undefined ? { mediaKeys: patch.mediaKeys } : {}),
+    },
+    include: postInclude,
   })
   return toPostDto(post, userId)
 }
@@ -205,46 +216,51 @@ export async function updatePost(userId: string, postId: string, body: unknown) 
 export async function deletePost(userId: string, postId: string) {
   const existing = await db.post.findUnique({ where: { id: postId } })
   if (!existing || existing.authorId !== userId) {
-    throw new HttpError(404, 'Post not found')
+    throw new HttpError('Post not found', 404)
   }
   await db.post.delete({ where: { id: postId } })
 }
 
 export async function listTimeline(
   viewerId: string,
-  opts: { cursor?: string; limit?: number }
+  opts: { cursor?: string; limit: number }
 ) {
-  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50)
   const unlocked = await getUnlockedProfileIds(viewerId)
   const baseWhere = timelineWhereForViewer(viewerId, unlocked)
 
-  let cursorWhere: Prisma.PostWhereInput = {}
+  let where: Prisma.PostWhereInput = baseWhere
   if (opts.cursor) {
-    const cur = await db.post.findUnique({ where: { id: opts.cursor } })
-    if (cur) {
-      cursorWhere = {
-        OR: [
-          { createdAt: { lt: cur.createdAt } },
-          { AND: [{ createdAt: cur.createdAt }, { id: { lt: cur.id } }] },
-        ],
-      }
+    const { createdAt, id } = decodeCursor(opts.cursor)
+    where = {
+      AND: [
+        baseWhere,
+        {
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { AND: [{ createdAt }, { id: { lt: id } }] },
+          ],
+        },
+      ],
     }
   }
 
-  const posts = await db.post.findMany({
-    where: { AND: [baseWhere, cursorWhere] },
+  const take = Math.min(opts.limit + 1, 51)
+  const rows = await db.post.findMany({
+    where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: limit + 1,
-    include: postListInclude,
+    take,
+    include: postInclude,
   })
 
-  let nextCursor: string | undefined
-  if (posts.length > limit) {
-    const last = posts.pop()!
-    nextCursor = last.id
-  }
+  const hasMore = rows.length > opts.limit
+  const page = hasMore ? rows.slice(0, opts.limit) : rows
+  const nextCursor =
+    hasMore && page.length > 0
+      ? encodeCursor(page[page.length - 1].createdAt, page[page.length - 1].id)
+      : null
+
   return {
-    data: posts.map((p) => toPostDto(p, viewerId)),
+    data: page.map((p) => toPostDto(p, viewerId)),
     nextCursor,
   }
 }
@@ -252,14 +268,14 @@ export async function listTimeline(
 async function resolveWallAuthorIds(profileId: string): Promise<string[]> {
   const profile = await db.profile.findUnique({ where: { id: profileId } })
   if (!profile) {
-    throw new HttpError(404, 'Profile not found')
+    throw new HttpError('Profile not found', 404)
   }
   if (profile.userId) {
     return [profile.userId]
   }
-  const couple = await db.couple.findFirst({ where: { profileId } })
+  const couple = await db.couple.findUnique({ where: { profileId } })
   if (!couple) {
-    throw new HttpError(404, 'Profile not found')
+    return []
   }
   return [couple.partner1Id, couple.partner2Id].filter(Boolean) as string[]
 }
@@ -267,98 +283,141 @@ async function resolveWallAuthorIds(profileId: string): Promise<string[]> {
 export async function listPostsForProfile(
   profileId: string,
   viewerId: string,
-  opts: { cursor?: string; limit?: number }
+  opts: { cursor?: string; limit: number }
 ) {
   const authorIds = await resolveWallAuthorIds(profileId)
-  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50)
-  const unlocked = await getUnlockedProfileIds(viewerId)
-
-  const wallWhere: Prisma.PostWhereInput = {
-    AND: [
-      { authorId: { in: authorIds } },
-      {
-        OR: [
-          { authorId: viewerId },
-          { visibility: 'PUBLIC' },
-          ...(unlocked.has(profileId) ? ([{ visibility: 'UNLOCKED_ONLY' }] as const) : []),
-        ],
-      },
-    ],
+  if (authorIds.length === 0) {
+    return { data: [] as PostDto[], nextCursor: null as string | null }
   }
 
-  let cursorWhere: Prisma.PostWhereInput = {}
+  const hasUnlock = await db.profileUnlock.findUnique({
+    where: { userId_targetId: { userId: viewerId, targetId: profileId } },
+  })
+
+  const visibilityOr: Prisma.PostWhereInput[] = [
+    { authorId: viewerId },
+    { visibility: 'PUBLIC' },
+  ]
+  if (hasUnlock) {
+    visibilityOr.push({ visibility: 'UNLOCKED_ONLY' })
+  }
+
+  const baseWhere: Prisma.PostWhereInput = {
+    AND: [{ authorId: { in: authorIds } }, { OR: visibilityOr }],
+  }
+
+  let where: Prisma.PostWhereInput = baseWhere
   if (opts.cursor) {
-    const cur = await db.post.findUnique({ where: { id: opts.cursor } })
-    if (cur) {
-      cursorWhere = {
-        OR: [
-          { createdAt: { lt: cur.createdAt } },
-          { AND: [{ createdAt: cur.createdAt }, { id: { lt: cur.id } }] },
-        ],
-      }
+    const { createdAt, id } = decodeCursor(opts.cursor)
+    where = {
+      AND: [
+        baseWhere,
+        {
+          OR: [
+            { createdAt: { lt: createdAt } },
+            { AND: [{ createdAt }, { id: { lt: id } }] },
+          ],
+        },
+      ],
     }
   }
 
-  const posts = await db.post.findMany({
-    where: { AND: [wallWhere, cursorWhere] },
+  const take = Math.min(opts.limit + 1, 51)
+  const rows = await db.post.findMany({
+    where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: limit + 1,
-    include: postListInclude,
+    take,
+    include: postInclude,
   })
 
-  let nextCursor: string | undefined
-  if (posts.length > limit) {
-    const last = posts.pop()!
-    nextCursor = last.id
-  }
+  const hasMore = rows.length > opts.limit
+  const page = hasMore ? rows.slice(0, opts.limit) : rows
+  const nextCursor =
+    hasMore && page.length > 0
+      ? encodeCursor(page[page.length - 1].createdAt, page[page.length - 1].id)
+      : null
+
   return {
-    data: posts.map((p) => toPostDto(p, viewerId)),
+    data: page.map((p) => toPostDto(p, viewerId)),
     nextCursor,
   }
 }
 
-async function loadPostForAuth(postId: string, viewerId: string) {
-  const post = await db.post.findUnique({
-    where: { id: postId },
-    include: postListInclude,
-  })
-  if (!post) {
-    throw new HttpError(404, 'Post not found')
+/** Whether viewer may read this post (timeline/wall rules, any wall context for unlock). */
+export async function canViewerReadPost(
+  post: PostLoaded,
+  viewerId: string,
+  unlocked: Set<string>
+): Promise<boolean> {
+  if (post.authorId === viewerId) return true
+  if (post.visibility === 'PUBLIC') return true
+  if (post.visibility === 'DRAFT') return false
+
+  if (post.visibility === 'UNLOCKED_ONLY') {
+    const ids = [
+      post.author.profile?.id,
+      post.author.coupleAsP1?.profileId,
+      post.author.coupleAsP2?.profileId,
+    ].filter(Boolean) as string[]
+    return ids.some((pid) => unlocked.has(pid))
   }
-  const ok = await canReadPostInTimeline(viewerId, {
-    authorId: post.authorId,
-    visibility: post.visibility,
-    author: post.author as AuthorWithWall,
-  })
-  if (!ok) {
-    throw new HttpError(404, 'Post not found')
-  }
-  return post
+  return false
 }
 
-export async function setReaction(viewerId: string, postId: string, type: ReactionType) {
-  await loadPostForAuth(postId, viewerId)
-  const existing = await db.postReaction.findFirst({
-    where: { postId, userId: viewerId },
-  })
-  if (existing) {
-    await db.postReaction.update({
-      where: { id: existing.id },
-      data: { type },
-    })
-  } else {
-    await db.postReaction.create({
-      data: { postId, userId: viewerId, type },
-    })
-  }
+export async function setReaction(
+  viewerId: string,
+  postId: string,
+  type: ReactionType
+) {
   const post = await db.post.findUnique({
     where: { id: postId },
-    include: postListInclude,
+    include: postInclude,
   })
-  return toPostDto(post!, viewerId)
+  if (!post) {
+    throw new HttpError('Post not found', 404)
+  }
+  const unlocked = await getUnlockedProfileIds(viewerId)
+  if (!(await canViewerReadPost(post, viewerId, unlocked))) {
+    throw new HttpError('Post not found', 404)
+  }
+
+  await db.postReaction.upsert({
+    where: {
+      postId_userId: { postId, userId: viewerId },
+    },
+    create: { postId, userId: viewerId, type },
+    update: { type },
+  })
+
+  const updated = await db.post.findUnique({
+    where: { id: postId },
+    include: postInclude,
+  })
+  if (!updated) throw new HttpError('Post not found', 404)
+  return toPostDto(updated, viewerId)
 }
 
 export async function removeReaction(viewerId: string, postId: string) {
-  await loadPostForAuth(postId, viewerId)
-  await db.postReaction.deleteMany({ where: { postId, userId: viewerId } })
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    include: postInclude,
+  })
+  if (!post) {
+    throw new HttpError('Post not found', 404)
+  }
+  const unlocked = await getUnlockedProfileIds(viewerId)
+  if (!(await canViewerReadPost(post, viewerId, unlocked))) {
+    throw new HttpError('Post not found', 404)
+  }
+
+  await db.postReaction.deleteMany({
+    where: { postId, userId: viewerId },
+  })
+
+  const updated = await db.post.findUnique({
+    where: { id: postId },
+    include: postInclude,
+  })
+  if (!updated) throw new HttpError('Post not found', 404)
+  return toPostDto(updated, viewerId)
 }

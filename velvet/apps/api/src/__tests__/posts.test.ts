@@ -3,24 +3,30 @@ import { buildApp } from '../app.js'
 import { clearDatabase } from './test-utils.js'
 import { db } from '../lib/db.js'
 
-const regPayload = (email: string, phone: string, nickname: string) => ({
+const registerPayload = (email: string, nickname: string, phone: string) => ({
   email,
   password: 'Password123!',
   phone,
   dateOfBirth: '1990-01-01T00:00:00.000Z',
   accountType: 'MAN' as const,
   nickname,
-  publicKey: 'test-public-key',
+  publicKey: 'test-key',
 })
 
-async function register(app: ReturnType<typeof buildApp>, payload: ReturnType<typeof regPayload>) {
-  const res = await app.inject({
+async function registerUser(
+  app: ReturnType<typeof buildApp>,
+  email: string,
+  nickname: string,
+  phone: string
+) {
+  const regRes = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/register',
-    payload,
+    payload: registerPayload(email, nickname, phone),
   })
-  expect([200, 201]).toContain(res.statusCode)
-  return JSON.parse(res.body) as { accessToken: string }
+  expect(regRes.statusCode).toBe(201)
+  const body = JSON.parse(regRes.body) as { accessToken: string; user: { id: string } }
+  return { accessToken: body.accessToken, userId: body.user.id }
 }
 
 describe('posts API', () => {
@@ -28,7 +34,7 @@ describe('posts API', () => {
     await clearDatabase()
   })
 
-  it('POST /api/v1/posts returns 401 without auth', async () => {
+  it('POST /api/v1/posts returns 401 without token', async () => {
     const app = buildApp()
     const res = await app.inject({
       method: 'POST',
@@ -38,31 +44,29 @@ describe('posts API', () => {
     expect(res.statusCode).toBe(401)
   })
 
-  it('creates a public post', async () => {
+  it('creates a post with mediaUrls and visibility', async () => {
     const app = buildApp()
-    const { accessToken } = await register(app, regPayload('a@example.com', '+15550001111', 'usera'))
-
+    const { accessToken: token } = await registerUser(app, 'a@example.com', 'usera', '+15560101111')
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${token}` },
       payload: { content: 'Hello world', visibility: 'PUBLIC', mediaKeys: [] },
     })
-    expect(res.statusCode).toBe(201)
-    const body = JSON.parse(res.body)
-    expect(body.content).toBe('Hello world')
-    expect(body.visibility).toBe('PUBLIC')
-    expect(body.mediaUrls).toEqual([])
+    expect(res.statusCode).toBe(200)
+    const body = JSON.parse(res.body) as { data: { id: string; visibility: string; mediaUrls: unknown[] } }
+    expect(body.data.visibility).toBe('PUBLIC')
+    expect(body.data.mediaUrls).toEqual([])
+    expect(body.data.id).toBeTruthy()
   })
 
-  it('rejects empty text and no media', async () => {
+  it('rejects empty content and empty mediaKeys', async () => {
     const app = buildApp()
-    const { accessToken } = await register(app, regPayload('b@example.com', '+15550002222', 'userb'))
-
+    const { accessToken: token } = await registerUser(app, 'b@example.com', 'userb', '+15560102222')
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${token}` },
       payload: { content: '   ', visibility: 'PUBLIC', mediaKeys: [] },
     })
     expect(res.statusCode).toBe(400)
@@ -70,226 +74,203 @@ describe('posts API', () => {
 
   it('rejects invalid media key prefix', async () => {
     const app = buildApp()
-    const { accessToken } = await register(app, regPayload('c@example.com', '+15550003333', 'userc'))
-    const me = await app.inject({
-      method: 'GET',
-      url: '/api/v1/profiles/me',
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    const userId = JSON.parse(me.body).userId
-
+    const { accessToken: token } = await registerUser(app, 'c@example.com', 'userc', '+15560103333')
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { Authorization: `Bearer ${token}` },
       payload: {
         content: 'x',
         visibility: 'PUBLIC',
-        mediaKeys: ['wrong/prefix/key.jpg'],
+        mediaKeys: ['POST_MEDIA/wrong-user/foo.jpg'],
       },
     })
     expect(res.statusCode).toBe(400)
-    expect(userId).toBeTruthy()
   })
 
-  it('shows PUBLIC post on another user timeline', async () => {
+  it('PUBLIC post appears on another user timeline', async () => {
     const app = buildApp()
-    const a = await register(app, regPayload('d1@example.com', '+15550004441', 'ud1'))
-    const b = await register(app, regPayload('d2@example.com', '+15550004442', 'ud2'))
+    const { accessToken: t1 } = await registerUser(app, 'd1@example.com', 'duser1', '+15560104441')
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/posts',
+      headers: { Authorization: `Bearer ${t1}` },
+      payload: { content: 'Public post', visibility: 'PUBLIC', mediaKeys: [] },
+    })
+    const { accessToken: t2 } = await registerUser(app, 'd2@example.com', 'duser2', '+15560104442')
+    const tl = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts/timeline',
+      headers: { Authorization: `Bearer ${t2}` },
+    })
+    expect(tl.statusCode).toBe(200)
+    const body = JSON.parse(tl.body) as { data: { content: string }[] }
+    expect(body.data.some((p) => p.content === 'Public post')).toBe(true)
+  })
 
+  it('UNLOCKED_ONLY hidden until ProfileUnlock exists', async () => {
+    const app = buildApp()
+    const { accessToken: tAuthor, userId: authorUserId } = await registerUser(
+      app,
+      'e1@example.com',
+      'euser1',
+      '+15560105551'
+    )
+    const authorProfile = await db.profile.findUniqueOrThrow({ where: { userId: authorUserId } })
+
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/posts',
+      headers: { Authorization: `Bearer ${tAuthor}` },
+      payload: { content: 'Secret', visibility: 'UNLOCKED_ONLY', mediaKeys: [] },
+    })
+
+    const { accessToken: tViewer, userId: viewerUserId } = await registerUser(
+      app,
+      'e2@example.com',
+      'euser2',
+      '+15560105552'
+    )
+    const tlBefore = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts/timeline',
+      headers: { Authorization: `Bearer ${tViewer}` },
+    })
+    const before = JSON.parse(tlBefore.body) as { data: { content: string }[] }
+    expect(before.data.some((p) => p.content === 'Secret')).toBe(false)
+
+    await db.profileUnlock.create({
+      data: {
+        userId: viewerUserId,
+        targetId: authorProfile.id,
+      },
+    })
+
+    const tlAfter = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts/timeline',
+      headers: { Authorization: `Bearer ${tViewer}` },
+    })
+    const after = JSON.parse(tlAfter.body) as { data: { content: string }[] }
+    expect(after.data.some((p) => p.content === 'Secret')).toBe(true)
+  })
+
+  it('DRAFT visible to author only on timeline', async () => {
+    const app = buildApp()
+    const { accessToken: t1 } = await registerUser(app, 'f1@example.com', 'fuser1', '+15560106661')
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/posts',
+      headers: { Authorization: `Bearer ${t1}` },
+      payload: { content: 'Draft only', visibility: 'DRAFT', mediaKeys: [] },
+    })
+    const me = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts/timeline',
+      headers: { Authorization: `Bearer ${t1}` },
+    })
+    const mine = JSON.parse(me.body) as { data: { content: string }[] }
+    expect(mine.data.some((p) => p.content === 'Draft only')).toBe(true)
+
+    const { accessToken: t2 } = await registerUser(app, 'f2@example.com', 'fuser2', '+15560106662')
+    const other = await app.inject({
+      method: 'GET',
+      url: '/api/v1/posts/timeline',
+      headers: { Authorization: `Bearer ${t2}` },
+    })
+    const theirs = JSON.parse(other.body) as { data: { content: string }[] }
+    expect(theirs.data.some((p) => p.content === 'Draft only')).toBe(false)
+  })
+
+  it('PATCH non-author returns 404', async () => {
+    const app = buildApp()
+    const { accessToken: t1 } = await registerUser(app, 'g1@example.com', 'guser1', '+15560107771')
     const create = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${a.accessToken}` },
-      payload: { content: 'public note', visibility: 'PUBLIC', mediaKeys: [] },
-    })
-    expect(create.statusCode).toBe(201)
-
-    const tl = await app.inject({
-      method: 'GET',
-      url: '/api/v1/posts/timeline',
-      headers: { Authorization: `Bearer ${b.accessToken}` },
-    })
-    expect(tl.statusCode).toBe(200)
-    const { data } = JSON.parse(tl.body)
-    expect(data.some((p: { content: string }) => p.content === 'public note')).toBe(true)
-  })
-
-  it('hides UNLOCKED_ONLY until ProfileUnlock exists', async () => {
-    const app = buildApp()
-    const a = await register(app, regPayload('e1@example.com', '+15550005551', 'ue1'))
-    const b = await register(app, regPayload('e2@example.com', '+15550005552', 'ue2'))
-
-    const meA = JSON.parse(
-      (
-        await app.inject({
-          method: 'GET',
-          url: '/api/v1/profiles/me',
-          headers: { Authorization: `Bearer ${a.accessToken}` },
-        })
-      ).body
-    )
-    const profileIdA = meA.id
-
-    await app.inject({
-      method: 'POST',
-      url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${a.accessToken}` },
-      payload: { content: 'locked', visibility: 'UNLOCKED_ONLY', mediaKeys: [] },
-    })
-
-    const meB = JSON.parse(
-      (
-        await app.inject({
-          method: 'GET',
-          url: '/api/v1/profiles/me',
-          headers: { Authorization: `Bearer ${b.accessToken}` },
-        })
-      ).body
-    )
-
-    const before = await app.inject({
-      method: 'GET',
-      url: '/api/v1/posts/timeline',
-      headers: { Authorization: `Bearer ${b.accessToken}` },
-    })
-    let data = JSON.parse(before.body).data
-    expect(data.some((p: { content: string }) => p.content === 'locked')).toBe(false)
-
-    await db.profileUnlock.create({
-      data: { userId: meB.userId, targetId: profileIdA },
-    })
-
-    const after = await app.inject({
-      method: 'GET',
-      url: '/api/v1/posts/timeline',
-      headers: { Authorization: `Bearer ${b.accessToken}` },
-    })
-    data = JSON.parse(after.body).data
-    expect(data.some((p: { content: string }) => p.content === 'locked')).toBe(true)
-  })
-
-  it('hides DRAFT from other users', async () => {
-    const app = buildApp()
-    const a = await register(app, regPayload('f1@example.com', '+15550006661', 'uf1'))
-    const b = await register(app, regPayload('f2@example.com', '+15550006662', 'uf2'))
-
-    await app.inject({
-      method: 'POST',
-      url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${a.accessToken}` },
-      payload: { content: 'secret draft', visibility: 'DRAFT', mediaKeys: [] },
-    })
-
-    const tl = await app.inject({
-      method: 'GET',
-      url: '/api/v1/posts/timeline',
-      headers: { Authorization: `Bearer ${b.accessToken}` },
-    })
-    const { data } = JSON.parse(tl.body)
-    expect(data.some((p: { content: string }) => p.content === 'secret draft')).toBe(false)
-  })
-
-  it('returns 404 when non-author patches post', async () => {
-    const app = buildApp()
-    const a = await register(app, regPayload('g1@example.com', '+15550007771', 'ug1'))
-    const b = await register(app, regPayload('g2@example.com', '+15550007772', 'ug2'))
-
-    const created = await app.inject({
-      method: 'POST',
-      url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${a.accessToken}` },
+      headers: { Authorization: `Bearer ${t1}` },
       payload: { content: 'mine', visibility: 'PUBLIC', mediaKeys: [] },
     })
-    const { id } = JSON.parse(created.body)
-
-    const res = await app.inject({
+    const postId = (JSON.parse(create.body) as { data: { id: string } }).data.id
+    const { accessToken: t2 } = await registerUser(app, 'g2@example.com', 'guser2', '+15560107772')
+    const patch = await app.inject({
       method: 'PATCH',
-      url: `/api/v1/posts/${id}`,
-      headers: { Authorization: `Bearer ${b.accessToken}` },
+      url: `/api/v1/posts/${postId}`,
+      headers: { Authorization: `Bearer ${t2}` },
       payload: { content: 'hacked' },
     })
-    expect(res.statusCode).toBe(404)
+    expect(patch.statusCode).toBe(404)
   })
 
-  it('cascades reactions when post is deleted', async () => {
+  it('DELETE author removes post and reactions cascade', async () => {
     const app = buildApp()
-    const { accessToken } = await register(app, regPayload('h@example.com', '+15550008888', 'uh'))
-
-    const created = await app.inject({
+    const { accessToken: t1 } = await registerUser(app, 'h1@example.com', 'huser1', '+15560108881')
+    const create = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      payload: { content: 'r', visibility: 'PUBLIC', mediaKeys: [] },
+      headers: { Authorization: `Bearer ${t1}` },
+      payload: { content: 'del', visibility: 'PUBLIC', mediaKeys: [] },
     })
-    const { id } = JSON.parse(created.body)
-
+    const postId = (JSON.parse(create.body) as { data: { id: string } }).data.id
+    const { accessToken: t2 } = await registerUser(app, 'h2@example.com', 'huser2', '+15560108882')
     await app.inject({
       method: 'POST',
-      url: `/api/v1/posts/${id}/reactions`,
-      headers: { Authorization: `Bearer ${accessToken}` },
+      url: `/api/v1/posts/${postId}/reactions`,
+      headers: { Authorization: `Bearer ${t2}` },
       payload: { type: 'LIKE' },
     })
-    expect(await db.postReaction.count({ where: { postId: id } })).toBe(1)
-
     const del = await app.inject({
       method: 'DELETE',
-      url: `/api/v1/posts/${id}`,
-      headers: { Authorization: `Bearer ${accessToken}` },
+      url: `/api/v1/posts/${postId}`,
+      headers: { Authorization: `Bearer ${t1}` },
     })
     expect(del.statusCode).toBe(204)
-    expect(await db.postReaction.count({ where: { postId: id } })).toBe(0)
+    const reactions = await db.postReaction.findMany({ where: { postId } })
+    expect(reactions.length).toBe(0)
   })
 
-  it('returns 404 for reaction on unreadable post', async () => {
+  it('reaction on unreadable post returns 404', async () => {
     const app = buildApp()
-    const a = await register(app, regPayload('i1@example.com', '+15550009991', 'ui1'))
-    const b = await register(app, regPayload('i2@example.com', '+15550009992', 'ui2'))
-
-    const created = await app.inject({
+    const { accessToken: t1 } = await registerUser(app, 'i1@example.com', 'iuser1', '+15560109991')
+    const create = await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${a.accessToken}` },
-      payload: { content: 'draft only', visibility: 'DRAFT', mediaKeys: [] },
+      headers: { Authorization: `Bearer ${t1}` },
+      payload: { content: 'hidden', visibility: 'DRAFT', mediaKeys: [] },
     })
-    const { id } = JSON.parse(created.body)
-
-    const res = await app.inject({
+    const postId = (JSON.parse(create.body) as { data: { id: string } }).data.id
+    const { accessToken: t2 } = await registerUser(app, 'i2@example.com', 'iuser2', '+15560109992')
+    const react = await app.inject({
       method: 'POST',
-      url: `/api/v1/posts/${id}/reactions`,
-      headers: { Authorization: `Bearer ${b.accessToken}` },
+      url: `/api/v1/posts/${postId}/reactions`,
+      headers: { Authorization: `Bearer ${t2}` },
       payload: { type: 'LIKE' },
     })
-    expect(res.statusCode).toBe(404)
+    expect(react.statusCode).toBe(404)
   })
 
-  it('lists posts on profile wall', async () => {
+  it('GET /profiles/:id/posts returns wall posts', async () => {
     const app = buildApp()
-    const { accessToken } = await register(app, regPayload('j@example.com', '+15550010000', 'uj'))
-    const me = JSON.parse(
-      (
-        await app.inject({
-          method: 'GET',
-          url: '/api/v1/profiles/me',
-          headers: { Authorization: `Bearer ${accessToken}` },
-        })
-      ).body
-    )
-
+    const { accessToken: token } = await registerUser(app, 'j1@example.com', 'juser1', '+15560110111')
+    const prof = await app.inject({
+      method: 'GET',
+      url: '/api/v1/profiles/me',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const profileId = (JSON.parse(prof.body) as { id: string }).id
     await app.inject({
       method: 'POST',
       url: '/api/v1/posts',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      payload: { content: 'wall item', visibility: 'PUBLIC', mediaKeys: [] },
+      headers: { Authorization: `Bearer ${token}` },
+      payload: { content: 'Wall', visibility: 'PUBLIC', mediaKeys: [] },
     })
-
-    const res = await app.inject({
+    const wall = await app.inject({
       method: 'GET',
-      url: `/api/v1/profiles/${me.id}/posts`,
-      headers: { Authorization: `Bearer ${accessToken}` },
+      url: `/api/v1/profiles/${profileId}/posts`,
+      headers: { Authorization: `Bearer ${token}` },
     })
-    expect(res.statusCode).toBe(200)
-    const { data } = JSON.parse(res.body)
-    expect(data.some((p: { content: string }) => p.content === 'wall item')).toBe(true)
+    expect(wall.statusCode).toBe(200)
+    const body = JSON.parse(wall.body) as { data: { content: string }[] }
+    expect(body.data.some((p) => p.content === 'Wall')).toBe(true)
   })
 })

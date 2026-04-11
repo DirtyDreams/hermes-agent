@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import ProfileHeader from '../components/profile/ProfileHeader'
 import PostCard, { type TimelinePost } from '../components/posts/PostCard'
 import ComposePost from '../components/posts/ComposePost'
-import { CreditCard, Info, Image, Video, Users, MessageSquare } from 'lucide-react'
+import { Info, Image, Video, Users, MessageSquare } from 'lucide-react'
 
 type TabType = 'WALL' | 'ABOUT' | 'PHOTOS' | 'VIDEOS' | 'FRIENDS'
 
@@ -19,27 +19,27 @@ export default function ProfileView() {
     queryFn: async () => {
       const { data } = await api.get(`/profiles/${userId}`)
       return data
-    },
+    }
   })
 
   const { data: myProfile } = useQuery({
     queryKey: ['profile-me'],
     queryFn: async () => {
       const { data } = await api.get('/profiles/me')
-      return data
+      return data as { id: string }
     },
   })
 
-  const { data: wallData } = useQuery({
+  const { data: wallData, isLoading: wallLoading } = useQuery({
     queryKey: ['profile-posts', userId],
     queryFn: async () => {
       const { data } = await api.get<{ data: TimelinePost[] }>(`/profiles/${userId}/posts`)
       return data
     },
-    enabled: !!userId && !!profile,
+    enabled: !!userId && activeTab === 'WALL',
   })
 
-  const isOwnWall = !!(myProfile && userId && myProfile.id === userId)
+  const isOwnProfile = !!(myProfile && profile && myProfile.id === profile.id)
 
   if (isLoading) return <div className="p-20 text-center animate-pulse">Wczytywanie profilu...</div>
   if (!profile) return <div className="p-20 text-center">Profil nie istnieje</div>
@@ -152,23 +152,28 @@ export default function ProfileView() {
           )}
 
           {activeTab === 'WALL' && (
-            <motion.div key="wall" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-              {isOwnWall && <ComposePost />}
-              {wallData?.data?.length ? (
-                <div className="space-y-4">
-                  {wallData.data.map((p) => (
-                    <PostCard key={p.id} post={p} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 text-zinc-700">
-                    <MessageSquare size={32} />
-                  </div>
-                  <h3 className="text-zinc-500 font-bold">Brak postów na tablicy</h3>
-                </div>
-              )}
-            </motion.div>
+             <motion.div
+               key="wall"
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               className="space-y-6"
+             >
+               {isOwnProfile && <ComposePost />}
+               {wallLoading && <p className="text-zinc-500 text-center py-8">Ładowanie tablicy…</p>}
+               {!wallLoading && wallData?.data?.length === 0 && (
+                 <div className="text-center py-12">
+                   <div className="w-16 h-16 bg-zinc-900 rounded-full flex items-center justify-center mx-auto mb-4 text-zinc-700">
+                     <MessageSquare size={32} />
+                   </div>
+                   <h3 className="text-zinc-500 font-bold">Brak postów na tablicy</h3>
+                 </div>
+               )}
+               <div className="space-y-4">
+                 {wallData?.data?.map((post) => (
+                   <PostCard key={post.id} post={post} />
+                 ))}
+               </div>
+             </motion.div>
           )}
         </AnimatePresence>
       </div>
