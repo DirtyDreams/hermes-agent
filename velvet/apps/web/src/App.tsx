@@ -9,6 +9,7 @@ import Chat from './pages/Chat'
 import Onboarding from './pages/Onboarding'
 import LiveBoard from './pages/LiveBoard'
 import CoupleInvite from './pages/CoupleInvite'
+import CouplePortal from './pages/CouplePortal'
 import Layout from './components/Layout'
 
 const queryClient = new QueryClient()
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="onboarding" element={<Onboarding />} />
             <Route path="board" element={<LiveBoard />} />
             <Route path="couple/invite" element={<CoupleInvite />} />
+            <Route path="couple/portal" element={<CouplePortal />} />
             <Route path="conversations" element={<Conversations />} />
             <Route path="chat/:id" element={<Chat />} />
           </Route>
