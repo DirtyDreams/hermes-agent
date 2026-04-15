@@ -44,6 +44,7 @@ export function ChatView() {
 
       <div className="flex items-end gap-3">
         <Textarea
+          aria-label="Message Hermes"
           value={composerText}
           onChange={(e) => setComposerText(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -52,27 +53,31 @@ export function ChatView() {
         />
         <div className="flex flex-col gap-2">
           <Button
+            type="button"
             onClick={() => openPanel('fileBrowser')}
             variant="ghost"
             size="sm"
             title="File Browser"
+            aria-label="Open file browser"
           >
             <Files className="h-4 w-4" />
           </Button>
           <Button
+            type="button"
             onClick={() => openPanel('dashboard')}
             variant="ghost"
             size="sm"
             title="Dashboard"
+            aria-label="Open dashboard"
           >
             <LayoutDashboard className="h-4 w-4" />
           </Button>
           {isStreaming ? (
-            <Button variant="destructive" onClick={cancelStream}>
+            <Button type="button" variant="destructive" onClick={cancelStream} aria-label="Cancel streaming">
               <Square className="h-4 w-4" />
             </Button>
           ) : (
-            <Button onClick={() => void handleSend()} disabled={!composerText.trim()}>
+            <Button type="button" onClick={() => void handleSend()} disabled={!composerText.trim()} aria-label="Send message">
               <Send className="h-4 w-4" />
             </Button>
           )}

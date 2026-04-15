@@ -24,14 +24,16 @@ export function DashboardPanel() {
           Agent Dashboard
         </h2>
         <button
+          type="button"
           onClick={closePanel}
+          aria-label="Close dashboard panel"
           className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
-      <Tabs.Root defaultValue="health" className="flex flex-1 flex-col overflow-hidden">
+      <Tabs.Root defaultValue="health" aria-label="Agent Dashboard sections" className="flex flex-1 flex-col overflow-hidden">
         <Tabs.List className="flex flex-wrap gap-1 border-b border-slate-800 px-4 pt-2">
           {['health', 'presets', 'skills', 'mcp'].map((tab) => (
             <Tabs.Trigger
