@@ -66,3 +66,21 @@ def add_source(notebook_id: str, source: str) -> dict[str, Any]:
         raise ValueError("add_source: source cannot be empty")
     output = run(["notebook", "add-source", notebook_id, source, "--json"])
     return output
+
+
+def ask_question(notebook_id: str, question: str) -> dict[str, Any]:
+    """Ask a question to a notebook.
+
+    Args:
+        notebook_id: The notebook ID
+        question: The question to ask
+
+    Returns:
+        dict with answer from NotebookLM
+    """
+    if not notebook_id or not notebook_id.strip():
+        raise ValueError("ask_question: notebook_id cannot be empty")
+    if not question or not question.strip():
+        raise ValueError("ask_question: question cannot be empty")
+    output = run(["notebook", "ask", notebook_id, question, "--json"])
+    return output

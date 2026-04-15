@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from .wrapper import add_source, create_notebook, get_notebook_state, list_notebooks
+from .wrapper import add_source, ask_question, create_notebook, get_notebook_state, list_notebooks
 
 
 def main() -> int:
@@ -24,6 +24,11 @@ def main() -> int:
     add_source_parser = subparsers.add_parser("add-source", help="Add a source to a notebook")
     add_source_parser.add_argument("notebook_id", help="Notebook ID")
     add_source_parser.add_argument("source", help="URL or file path to add as source")
+
+    # ask <notebook_id> <question>
+    ask_parser = subparsers.add_parser("ask", help="Ask a question to a notebook")
+    ask_parser.add_argument("notebook_id", help="Notebook ID")
+    ask_parser.add_argument("question", help="Question to ask")
 
     args = parser.parse_args()
 
@@ -47,6 +52,12 @@ def main() -> int:
         result = add_source(args.notebook_id, args.source)
         print(f"Source added: {args.source}")
         print(f"Status: {result.get('status', 'unknown')}")
+        return 0
+
+    if args.command == "ask":
+        result = ask_question(args.notebook_id, args.question)
+        answer = result.get("answer", str(result))
+        print(answer)
         return 0
 
     return 0
