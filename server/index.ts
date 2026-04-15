@@ -358,7 +358,8 @@ app.get('/api/skills/list', async (_req: Request, res: Response) => {
       res.json({ skills: [], error: result.stderr.trim() })
       return
     }
-    const skills = JSON.parse(result.stdout)
+    let skills: unknown[] = []
+    try { skills = JSON.parse(result.stdout) } catch { /* Hermes returned non-JSON — return empty */ }
     res.json({ skills })
   } catch (error) {
     res.status(500).json({ skills: [], error: String(error) })
@@ -372,7 +373,8 @@ app.get('/api/mcp/tools', async (_req: Request, res: Response) => {
       res.json({ servers: [], error: result.stderr.trim() })
       return
     }
-    const servers = JSON.parse(result.stdout)
+    let servers: unknown[] = []
+    try { servers = JSON.parse(result.stdout) } catch { /* Hermes returned non-JSON — return empty */ }
     res.json({ servers })
   } catch (error) {
     res.status(500).json({ servers: [], error: String(error) })
@@ -386,7 +388,8 @@ app.get('/api/providers/list', async (_req: Request, res: Response) => {
       res.json({ providers: [], error: result.stderr.trim() })
       return
     }
-    const providers = JSON.parse(result.stdout)
+    let providers: unknown[] = []
+    try { providers = JSON.parse(result.stdout) } catch { /* Hermes returned non-JSON — return empty */ }
     res.json({ providers })
   } catch (error) {
     // Fallback: try to parse from config
@@ -398,10 +401,11 @@ app.get('/api/jobs/list', async (_req: Request, res: Response) => {
   try {
     const result = await runCommand('hermes', ['jobs', 'list', '--json'], 30_000)
     if (result.exitCode !== 0) {
-      res.json({ jobs: [], error: result.stderr.trim() })
+      res.status(500).json({ jobs: [], error: result.stderr.trim() })
       return
     }
-    const jobs = JSON.parse(result.stdout)
+    let jobs: unknown[] = []
+    try { jobs = JSON.parse(result.stdout) } catch { /* Hermes returned non-JSON — return empty */ }
     res.json({ jobs })
   } catch (error) {
     res.status(500).json({ jobs: [], error: String(error) })
@@ -425,10 +429,7 @@ app.get('/api/system/health', async (_req: Request, res: Response) => {
       runCommand('hermes', ['system', 'info', '--json'], 20_000).catch(() => ({ stdout: '', stderr: '', exitCode: 1 })),
     ])
 
-    let healthData = { memory: null, uptime: null, activeModel: null }
-    if (memoryResult.exitCode === 0) {
-      try { healthData = JSON.parse(memoryResult.stdout) } catch { /* ignore */ }
-    }
+    let healthData: { memory: null; uptime: null; activeModel: null } | Record<string, unknown> = { memory: null, uptime: null, activeModel: null }
 
     res.json({
       hermesInstalled: versionResult.exitCode === 0,
