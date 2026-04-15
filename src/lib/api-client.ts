@@ -89,7 +89,7 @@ export async function* streamChat(
   }
 }
 
-export async function getToolEvents(): Promise<ReadableStream<SSESEvent>> {
+export async function getToolEvents(): Promise<ReadableStream<SSEEvent>> {
   const response = await fetch('/api/chat/tool-events')
   return response.body!
 }
