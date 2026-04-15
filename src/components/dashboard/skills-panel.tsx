@@ -4,6 +4,7 @@ import { useSkills, type Skill } from '../../hooks/use-dashboard-data'
 import { Search, BookOpen } from 'lucide-react'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
+import { Select } from '../ui/select'
 import { cn } from '../../lib/utils'
 
 function SkillCard({ skill }: { skill: Skill }) {
@@ -73,16 +74,16 @@ export function SkillsPanel() {
             className="pl-9 bg-slate-950/80 text-slate-100"
           />
         </div>
-        <select
+        <Select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
-          className="rounded-xl border border-slate-700 bg-slate-900/80 px-3 text-sm text-slate-100"
+          className="bg-slate-950/80 text-slate-100"
         >
           <option value="all">All</option>
           <option value="built-in">Built-in</option>
           <option value="user">User</option>
           <option value="marketplace">Marketplace</option>
-        </select>
+        </Select>
       </div>
 
       {loading && <p className="text-sm text-slate-400">Loading skills...</p>}
