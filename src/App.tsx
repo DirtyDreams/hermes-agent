@@ -10,6 +10,7 @@ import { Textarea } from './components/ui/textarea'
 import { ChatView } from './components/chat-view'
 import { ToolActivityPanel } from './components/tool-activity-panel'
 import { DashboardPanel } from './components/dashboard/dashboard-panel'
+import { WorkspacePanel } from './components/workspace/workspace-panel'
 
 type ChatSettings = {
   profile: string
@@ -557,6 +558,7 @@ function App() {
         </div>
         <ToolActivityPanel />
         <DashboardPanel />
+        <WorkspacePanel />
       </div>
     </div>
   )
