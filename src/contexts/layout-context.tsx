@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
 
-type ActivePanel = 'none' | 'toolActivity' | 'fileBrowser' | 'dashboard'
-type SidebarExpanded = 'expanded' | 'collapsed'
+export type ActivePanel = 'none' | 'toolActivity' | 'fileBrowser' | 'dashboard'
+export type SidebarExpanded = 'expanded' | 'collapsed'
 
-type LayoutState = {
+export type LayoutState = {
   sidebarExpanded: SidebarExpanded
   activePanel: ActivePanel
   openPanel: (panel: ActivePanel) => void
@@ -17,10 +17,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [sidebarExpanded, setSidebarExpanded] = useState<SidebarExpanded>('expanded')
   const [activePanel, setActivePanel] = useState<ActivePanel>('none')
 
-  const openPanel = (panel: ActivePanel) => setActivePanel(panel)
-  const closePanel = () => setActivePanel('none')
-  const toggleSidebar = () =>
-    setSidebarExpanded((prev) => (prev === 'expanded' ? 'collapsed' : 'expanded'))
+  const openPanel = useCallback((panel: ActivePanel) => setActivePanel(panel), [])
+  const closePanel = useCallback(() => setActivePanel('none'), [])
+  const toggleSidebar = useCallback(
+    () => setSidebarExpanded((prev) => (prev === 'expanded' ? 'collapsed' : 'expanded')),
+    [],
+  )
 
   return (
     <LayoutContext.Provider value={{ sidebarExpanded, activePanel, openPanel, closePanel, toggleSidebar }}>
