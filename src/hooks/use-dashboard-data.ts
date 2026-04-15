@@ -14,6 +14,7 @@ export function useSkills() {
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/skills/list')
       const data = await res.json() as { skills?: Skill[]; error?: string }
@@ -37,6 +38,7 @@ export function useMCPServers() {
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/mcp/tools')
       const data = await res.json() as { servers?: MCPServer[]; error?: string }
@@ -56,29 +58,45 @@ export function useMCPServers() {
 export function useProviders() {
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/providers/list')
       .then((r) => r.json())
-      .then((d: { providers?: Provider[] }) => setProviders(d.providers ?? []))
-      .catch(() => setProviders([]))
+      .then((d: { providers?: Provider[]; error?: string }) => {
+        if (d.error) setError(d.error)
+        setProviders(d.providers ?? [])
+      })
+      .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }, [])
 
-  return { providers, loading }
+  return { providers, loading, error }
 }
 
 export function useJobs() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setError(null)
     try {
       const res = await fetch('/api/jobs/list')
-      const data = await res.json() as { jobs?: Job[] }
-      setJobs(data.jobs ?? [])
-    } catch { setJobs([]) } finally { setLoading(false) }
+      const data = await res.json() as { jobs?: Job[]; error?: string }
+      if (data.error) {
+        setError(data.error)
+        setJobs([])
+      } else {
+        setJobs(data.jobs ?? [])
+      }
+    } catch (e) {
+      setError(String(e))
+      setJobs([])
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { void refresh() }, [refresh])
@@ -88,18 +106,22 @@ export function useJobs() {
     await refresh()
   }, [refresh])
 
-  return { jobs, loading, refresh, cancel }
+  return { jobs, loading, error, refresh, cancel }
 }
 
 export function useHealth() {
   const [health, setHealth] = useState<HealthStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setLoading(true)
     fetch('/api/system/health')
       .then((r) => r.json())
-      .then((d: HealthStatus) => setHealth(d))
-      .catch(() => null)
+      .then((d: HealthStatus) => { setHealth(d); setError(null) })
+      .catch((e) => { setError(String(e)); setHealth(null) })
+      .finally(() => setLoading(false))
   }, [])
 
-  return health
+  return { health, loading, error }
 }
