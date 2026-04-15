@@ -60,7 +60,12 @@ function TreeNodeRow({ node, selectedPath, onSelect, onDelete, onCreateFile, onC
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         {isDir && (
-          <button onClick={() => setExpanded((p) => !p)} className="flex-shrink-0">
+          <button
+            type="button"
+            aria-label={expanded ? 'Collapse folder' : 'Expand folder'}
+            onClick={() => setExpanded((p) => !p)}
+            className="flex-shrink-0"
+          >
             {expanded ? <ChevronDown className="h-3 w-3 text-slate-400" /> : <ChevronRight className="h-3 w-3 text-slate-400" />}
           </button>
         )}
@@ -76,6 +81,9 @@ function TreeNodeRow({ node, selectedPath, onSelect, onDelete, onCreateFile, onC
 
         <div className="relative" onClick={(e) => e.stopPropagation()}>
           <button
+            type="button"
+            aria-label="More options"
+            aria-expanded={menuOpen}
             onClick={() => setMenuOpen((p) => !p)}
             className="rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-slate-700 transition"
           >

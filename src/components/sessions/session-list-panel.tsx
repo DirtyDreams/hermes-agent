@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useSessions, type Session } from '../../hooks/use-sessions'
 import { Plus, Search, Archive, Trash2, Edit2, Copy, Download, ChevronDown, ChevronRight } from 'lucide-react'
 import { Input } from '../ui/input'
@@ -106,6 +106,9 @@ function SessionRow({ session, selected, onSelect, onRename, onArchive, onDelete
       </div>
       <div className="relative" onClick={(e) => e.stopPropagation()}>
         <button
+          type="button"
+          aria-label="Session options"
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen((p) => !p)}
           className="rounded-lg p-1 opacity-0 group-hover:opacity-100 hover:bg-slate-700 transition"
         >
@@ -145,6 +148,21 @@ export function SessionListPanel({ selectedSessionId, onSelect }: Props) {
   const [searchQ, setSearchQ] = useState('')
   const [showArchived, setShowArchived] = useState(false)
 
+  const handleDuplicate = useCallback(async (id: string) => {
+    const s = sessions.find((s) => s.id === id)
+    if (s) await create(s.title)
+  }, [sessions, create])
+
+  const handleExport = useCallback(async (id: string) => {
+    const content = await exportSession(id)
+    const blob = new Blob([content], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `session-${id}.md`
+    a.click()
+  }, [exportSession])
+
   const groups = useMemo(() => {
     const all = searchQ ? sessions.filter((s) => s.title.toLowerCase().includes(searchQ.toLowerCase())) : sessions
     const visible = showArchived ? all : all.filter((s) => !s.archived)
@@ -163,7 +181,7 @@ export function SessionListPanel({ selectedSessionId, onSelect }: Props) {
             className="pl-9 bg-slate-950/80 text-slate-100"
           />
         </div>
-        <Button size="sm" onClick={() => void create()} className="bg-emerald-500 border-emerald-500 text-slate-950 hover:bg-emerald-400">
+        <Button type="button" size="sm" onClick={() => void create()} aria-label="Create new session" className="bg-emerald-500 border-emerald-500 text-slate-950 hover:bg-emerald-400">
           <Plus className="h-4 w-4" />
         </Button>
       </div>
@@ -185,8 +203,8 @@ export function SessionListPanel({ selectedSessionId, onSelect }: Props) {
             onRename={rename}
             onArchive={archive}
             onDelete={remove}
-            onDuplicate={async (id) => { const s = sessions.find((s) => s.id === id); if (s) await create(s.title) }}
-            onExport={async (id) => { const content = await exportSession(id); const blob = new Blob([content], { type: 'text/markdown' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `session-${id}.md`; a.click() }}
+            onDuplicate={handleDuplicate}
+            onExport={handleExport}
           />
         ))}
       </div>

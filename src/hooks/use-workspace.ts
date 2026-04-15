@@ -32,6 +32,8 @@ export function useWorkspace() {
         fetch('/api/workspace/tree'),
         fetch('/api/workspace/git'),
       ])
+      if (!treeRes.ok) throw new Error(`HTTP ${treeRes.status}`)
+      if (!gitRes.ok) throw new Error(`HTTP ${gitRes.status}`)
 
       const treeData = await treeRes.json() as WorkspaceTreeResponse
       const gitData = await gitRes.json() as GitInfo
@@ -40,17 +42,45 @@ export function useWorkspace() {
       setWorkdir(treeData.workdir)
       setGitInfo(gitData)
     } catch (e) {
+      if ((e as Error).name === 'AbortError') return
       setError(String(e))
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { void reload() }, [reload])
+  useEffect(() => {
+    const controller = new AbortController()
+    const run = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const [treeRes, gitRes] = await Promise.all([
+          fetch('/api/workspace/tree', { signal: controller.signal }),
+          fetch('/api/workspace/git', { signal: controller.signal }),
+        ])
+        if (!treeRes.ok) throw new Error(`HTTP ${treeRes.status}`)
+        if (!gitRes.ok) throw new Error(`HTTP ${gitRes.status}`)
+        const treeData = await treeRes.json() as WorkspaceTreeResponse
+        const gitData = await gitRes.json() as GitInfo
+        setTree(treeData.tree)
+        setWorkdir(treeData.workdir)
+        setGitInfo(gitData)
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return
+        setError(String(e))
+      } finally {
+        setLoading(false)
+      }
+    }
+    void run()
+    return () => controller.abort()
+  }, [])
 
   const readFile = useCallback(async (path: string): Promise<{ content: string; mimeType: string } | null> => {
     try {
       const res = await fetch(`/api/workspace/read?path=${encodeURIComponent(path)}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as WorkspaceReadResponse
       return { content: data.content, mimeType: data.mimeType }
     } catch {
@@ -65,6 +95,7 @@ export function useWorkspace() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, content }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as OkResponse
       if (data.ok) {
         await reload()
@@ -81,6 +112,7 @@ export function useWorkspace() {
       const res = await fetch(`/api/workspace/delete?path=${encodeURIComponent(path)}`, {
         method: 'DELETE',
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as OkResponse
       if (data.ok) {
         await reload()
@@ -99,6 +131,7 @@ export function useWorkspace() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as OkResponse
       if (data.ok) {
         await reload()

@@ -4,7 +4,6 @@ import { useWorkspace } from '../../hooks/use-workspace'
 import { X, Edit2, Save, Download, FileText, Image } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Textarea } from '../ui/textarea'
-import { cn } from '../../lib/utils'
 
 type Props = {
   path: string
@@ -69,26 +68,26 @@ export function FilePreview({ path, onClose }: Props) {
           <span className="truncate text-sm font-medium text-white">{path.split('/').pop()}</span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <Button variant="ghost" size="sm" onClick={handleDownload} title="Download">
+          <Button type="button" variant="ghost" size="sm" onClick={handleDownload} aria-label="Download file">
             <Download className="h-4 w-4" />
           </Button>
           {!isImage && (
             editing ? (
               <>
-                <Button size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-500 border-emerald-500 text-slate-950 hover:bg-emerald-400">
+                <Button type="button" size="sm" onClick={handleSave} disabled={saving} className="bg-emerald-500 border-emerald-500 text-slate-950 hover:bg-emerald-400">
                   <Save className="h-4 w-4 mr-1" /> {saving ? 'Saving...' : 'Save'}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setEditContent(content) }}>
+                <Button type="button" variant="ghost" size="sm" onClick={() => { setEditing(false); setEditContent(content) }}>
                   Cancel
                 </Button>
               </>
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setEditing(true)}>
                 <Edit2 className="h-4 w-4 mr-1" /> Edit
               </Button>
             )
           )}
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button type="button" variant="ghost" size="sm" onClick={onClose} aria-label="Close preview">
             <X className="h-4 w-4" />
           </Button>
         </div>
