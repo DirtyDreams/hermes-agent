@@ -3,6 +3,7 @@ import express, { type Request, type Response } from 'express'
 import { promises as fs } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
 
 type ChatRequest = {
@@ -439,6 +440,106 @@ app.get('/api/system/health', async (_req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ error: String(error) })
   }
+})
+
+// Tool event emitter for cross-endpoint communication
+const toolEmitter = new EventEmitter()
+
+app.post('/api/chat/stream', async (req: Request, res: Response) => {
+  const payload = req.body as ChatRequest
+
+  if (!payload?.message || typeof payload.message !== 'string') {
+    res.status(400).json({ error: 'Field "message" is required.' })
+    return
+  }
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const args = buildHermesArgs(payload)
+  const startedAt = Date.now()
+
+  const child = spawn('hermes', args, {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true,
+    shell: false,
+  })
+
+  let stdout = ''
+  let stderr = ''
+
+  child.stdout.on('data', (chunk: Buffer) => {
+    const text = chunk.toString()
+    stdout += text
+    res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`)
+  })
+
+  child.stderr.on('data', (chunk: Buffer) => {
+    const text = chunk.toString()
+    stderr += text
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed.type === 'tool_call') {
+        res.write(`data: ${JSON.stringify({ type: 'tool_call', data: parsed })}\n\n`)
+        toolEmitter.emit('tool_call', parsed)
+      } else if (parsed.type === 'tool_result') {
+        res.write(`data: ${JSON.stringify({ type: 'tool_result', data: parsed })}\n\n`)
+        toolEmitter.emit('tool_result', parsed)
+      }
+    } catch {
+      res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`)
+    }
+  })
+
+  const timeout = setTimeout(() => {
+    child.kill('SIGTERM')
+    res.write(`data: ${JSON.stringify({ type: 'error', data: 'Timeout' })}\n\n`)
+    res.end()
+  }, payload.timeoutMs ?? 240_000)
+
+  child.on('close', (exitCode) => {
+    clearTimeout(timeout)
+    const durationMs = Date.now() - startedAt
+    res.write(`data: ${JSON.stringify({ type: 'done', data: { exitCode, durationMs } })}\n\n`)
+    res.end()
+  })
+
+  child.on('error', (error) => {
+    clearTimeout(timeout)
+    res.write(`data: ${JSON.stringify({ type: 'error', data: error.message })}\n\n`)
+    res.end()
+  })
+
+  req.on('close', () => {
+    clearTimeout(timeout)
+    child.kill('SIGTERM')
+  })
+})
+
+// SSE endpoint for tool events
+app.get('/api/chat/tool-events', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.flushHeaders()
+
+  const onToolCall = (data: unknown) => {
+    res.write(`data: ${JSON.stringify({ type: 'tool_call', data })}\n\n`)
+  }
+  const onToolResult = (data: unknown) => {
+    res.write(`data: ${JSON.stringify({ type: 'tool_result', data })}\n\n`)
+  }
+
+  toolEmitter.on('tool_call', onToolCall)
+  toolEmitter.on('tool_result', onToolResult)
+
+  _req.on('close', () => {
+    toolEmitter.off('tool_call', onToolCall)
+    toolEmitter.off('tool_result', onToolResult)
+  })
 })
 
 app.listen(port, () => {
