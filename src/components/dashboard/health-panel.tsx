@@ -63,12 +63,6 @@ export function HealthPanel() {
                   <span className="text-slate-400">Memory</span>
                   <span className="text-white">{health.memory}</span>
                 </div>
-                <div className="h-2 rounded-full bg-slate-800">
-                  <div
-                    className="h-2 rounded-full bg-emerald-500"
-                    style={{ width: health.memory || '0%' }}
-                  />
-                </div>
               </div>
             )}
           </Card>
