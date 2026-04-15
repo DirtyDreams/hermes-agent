@@ -3,7 +3,6 @@ import { useState } from 'react'
 import { useMCPServers, type MCPServer } from '../../hooks/use-dashboard-data'
 import { ChevronDown, ChevronRight, Server, CheckCircle, XCircle, Loader2 } from 'lucide-react'
 import { Badge } from '../ui/badge'
-import { cn } from '../../lib/utils'
 
 function ServerSection({ server }: { server: MCPServer }) {
   const [expanded, setExpanded] = useState(false)
@@ -21,7 +20,10 @@ function ServerSection({ server }: { server: MCPServer }) {
     <div className="rounded-xl border border-slate-700 bg-slate-900/60">
       <button
         onClick={() => setExpanded((p) => !p)}
+        type="button"
         className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-800/50"
+        aria-expanded={expanded}
+        aria-controls={`server-${server.name}`}
       >
         <div className="flex items-center gap-3">
           <Server className="h-4 w-4 text-slate-400" />
