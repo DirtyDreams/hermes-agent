@@ -45,6 +45,7 @@ async function runCommand(
   command: string,
   args: string[],
   timeoutMs = 240_000,
+  cwd?: string,
 ): Promise<CommandResult> {
   const startedAt = Date.now()
 
@@ -53,6 +54,7 @@ async function runCommand(
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
       shell: false,
+      ...(cwd ? { cwd } : {}),
     })
 
     let stdout = ''
@@ -649,13 +651,15 @@ app.post('/api/sessions/create', async (req: Request, res: Response) => {
 app.patch('/api/sessions/:id', async (req: Request, res: Response) => {
   const { id } = req.params
   const payload = req.body as { name?: string; color?: string; tag?: string; archived?: boolean }
+  const unsupported: string[] = []
+  if (payload.color !== undefined) unsupported.push('color')
+  if (payload.tag !== undefined) unsupported.push('tag')
+  if (payload.archived !== undefined) unsupported.push('archived')
   try {
     if (payload.name) {
       await runCommand('hermes', ['sessions', 'rename', id, payload.name], 20_000)
     }
-    // color/tag/archive are Hermes session metadata — Hermes CLI may not support these natively
-    // so we just acknowledge the call; extend when CLI adds support
-    res.json({ ok: true, id })
+    res.json({ ok: true, id, note: unsupported.length ? `Fields not supported by Hermes CLI: ${unsupported.join(', ')}` : undefined })
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : String(error) })
   }
@@ -810,8 +814,8 @@ app.get('/api/workspace/git', async (_req: Request, res: Response) => {
       return
     }
     const [branchResult, statusResult] = await Promise.all([
-      runCommand('git', ['branch', '--show-branch'], 10_000),
-      runCommand('git', ['status', '--porcelain'], 10_000),
+      runCommand('git', ['branch', '--show-branch'], 10_000, workdir),
+      runCommand('git', ['status', '--porcelain'], 10_000, workdir),
     ])
     const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : ''
     const dirtyCount = branchResult.exitCode === 0 ? statusResult.stdout.split(/\r?\n/).filter((l) => l.trim()).length : 0
