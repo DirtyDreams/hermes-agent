@@ -49,10 +49,12 @@ export async function* streamChat(
   onToolCall?: (name: string, params: Record<string, unknown>) => void,
   onToolResult?: (name: string, result: string) => void,
 ): AsyncGenerator<string, void, unknown> {
+  const controller = new AbortController()
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal: controller.signal,
   })
 
   if (!response.ok) {
@@ -91,5 +93,6 @@ export async function* streamChat(
 
 export async function getToolEvents(): Promise<ReadableStream<SSEEvent>> {
   const response = await fetch('/api/chat/tool-events')
+  if (!response.ok) throw new Error(`Failed to connect: ${response.statusText}`)
   return response.body!
 }
