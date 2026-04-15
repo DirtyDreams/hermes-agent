@@ -2,9 +2,13 @@
 
 import json
 import subprocess
+from pathlib import Path
 from typing import Any
 
 NOTEBOOKLM_CLI = "notebooklm"
+
+SUPPORTED_TYPES = ["audio", "video", "quiz", "flashcards", "slides", 
+                   "infographic", "report", "mindmap", "datatable"]
 
 
 def run(args: list[str]) -> dict[str, Any]:
@@ -84,3 +88,43 @@ def ask_question(notebook_id: str, question: str) -> dict[str, Any]:
         raise ValueError("ask_question: question cannot be empty")
     output = run(["notebook", "ask", notebook_id, question, "--json"])
     return output
+
+
+def generate(notebook_id: str, gen_type: str, wait: bool = False) -> dict[str, Any]:
+    """Generate content (audio, video, quiz, etc.).
+
+    Args:
+        notebook_id: The notebook ID
+        gen_type: Type of content (audio, video, quiz, flashcards, slides, etc.)
+        wait: If True, wait for generation to complete
+
+    Returns:
+        dict with generation status
+    """
+    if gen_type not in SUPPORTED_TYPES:
+        raise ValueError(f"Unknown type: {gen_type}. Use one of: {SUPPORTED_TYPES}")
+
+    cmd = ["notebook", "generate", gen_type, "--notebook", notebook_id]
+    if wait:
+        cmd.append("--wait")
+
+    output = run(cmd)
+    return output
+
+
+def download_artifact(notebook_id: str, artifact_type: str, output_dir: Path) -> list[Path]:
+    """Download generated artifacts.
+
+    Args:
+        notebook_id: The notebook ID
+        artifact_type: Type of artifact (audio, video, quiz, etc.)
+        output_dir: Directory to save downloaded files
+
+    Returns:
+        list of Path objects for downloaded files
+    """
+    cmd = ["notebook", "download", notebook_id, artifact_type, 
+           "--output", str(output_dir), "--json"]
+    output = run(cmd)
+    paths = output.get("downloaded", [])
+    return [Path(p) for p in paths]

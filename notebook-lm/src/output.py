@@ -3,7 +3,10 @@
 from pathlib import Path
 from typing import Literal
 
-ArtifactType = Literal["all", "pdf", "markdown", "slides"]
+from .wrapper import SUPPORTED_TYPES, download_artifact
+
+ArtifactType = Literal["all", "audio", "video", "quiz", "flashcards", "slides", 
+                       "infographic", "report", "mindmap", "datatable"]
 
 
 def download_all(
@@ -16,11 +19,21 @@ def download_all(
     Args:
         notebook_id: ID of the notebook.
         output_dir: Directory to save artifacts.
-        artifact_type: Type of artifact to download ("all", "pdf", "markdown", "slides").
+        artifact_type: Type of artifact to download.
 
     Returns:
         List of downloaded artifact paths.
     """
-    # Placeholder implementation
     output_dir.mkdir(parents=True, exist_ok=True)
-    return []
+
+    if artifact_type == "all":
+        types = SUPPORTED_TYPES
+    else:
+        types = [artifact_type]
+
+    downloaded = []
+    for atype in types:
+        paths = download_artifact(notebook_id, atype, output_dir / atype)
+        downloaded.extend(paths)
+
+    return downloaded

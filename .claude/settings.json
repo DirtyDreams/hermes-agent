@@ -31,7 +31,13 @@
       "Bash(sed -n '426,430p' src/App.tsx)",
       "Bash(sed -n '556,560p' src/App.tsx)",
       "Bash(npx tsc *)",
-      "Bash(ls *.json)"
+      "Bash(ls *.json)",
+      "Bash(curl -s http://localhost:8787/api/system/status)",
+      "Read(//c/Users/coyot/Desktop/testy/**)",
+      "Bash(curl -s http://localhost:8787/api/workspace/git)",
+      "Bash(curl -s http://localhost:8787/api/workspace/tree)",
+      "Bash(curl -s -X POST http://localhost:8787/api/sessions/create -H \"Content-Type: application/json\" -d '{\"name\":\"test\"}')",
+      "Bash(kill %1)"
     ]
   }
 }

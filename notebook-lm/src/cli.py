@@ -2,8 +2,19 @@
 
 import argparse
 import sys
+from pathlib import Path
 
-from .wrapper import add_source, ask_question, create_notebook, get_notebook_state, list_notebooks
+from .output import download_all
+from .wrapper import (
+    add_source,
+    ask_question,
+    create_notebook,
+    download_artifact,
+    generate,
+    get_notebook_state,
+    list_notebooks,
+    SUPPORTED_TYPES,
+)
 
 
 def main() -> int:
@@ -29,6 +40,18 @@ def main() -> int:
     ask_parser = subparsers.add_parser("ask", help="Ask a question to a notebook")
     ask_parser.add_argument("notebook_id", help="Notebook ID")
     ask_parser.add_argument("question", help="Question to ask")
+
+    # generate <notebook_id> <type>
+    gen_parser = subparsers.add_parser("generate", help="Generate content (audio, video, quiz, etc.)")
+    gen_parser.add_argument("notebook_id", help="Notebook ID")
+    gen_parser.add_argument("type", choices=SUPPORTED_TYPES, help="Type of content to generate")
+    gen_parser.add_argument("--wait", action="store_true", help="Wait for generation to complete")
+
+    # download <notebook_id> <artifact_type>
+    dl_parser = subparsers.add_parser("download", help="Download generated artifacts")
+    dl_parser.add_argument("notebook_id", help="Notebook ID")
+    dl_parser.add_argument("artifact_type", choices=SUPPORTED_TYPES, help="Type of artifact to download")
+    dl_parser.add_argument("--output", default="~/notebook-lm-output", help="Output directory")
 
     args = parser.parse_args()
 
@@ -58,6 +81,20 @@ def main() -> int:
         result = ask_question(args.notebook_id, args.question)
         answer = result.get("answer", str(result))
         print(answer)
+        return 0
+
+    if args.command == "generate":
+        result = generate(args.notebook_id, args.type, args.wait)
+        print(f"Generation started: {result.get('job_id', 'unknown')}")
+        if args.wait:
+            print(f"Output: {result.get('output', result)}")
+        return 0
+
+    if args.command == "download":
+        output_dir = Path(args.output).expanduser()
+        paths = download_artifact(args.notebook_id, args.artifact_type, output_dir)
+        for p in paths:
+            print(f"Downloaded: {p}")
         return 0
 
     return 0
