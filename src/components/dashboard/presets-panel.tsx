@@ -23,11 +23,17 @@ const DEFAULT_PRESETS: Preset[] = [
 
 export function PresetsPanel() {
   const [presets, setPresets] = useState<Preset[]>(DEFAULT_PRESETS)
-  const [activePresetId, setActivePresetId] = useState<string | null>(null)
+  const savedPreset = localStorage.getItem('hermes-active-preset')
+const savedPresetId = savedPreset ? JSON.parse(savedPreset).id : null
+const [activePresetId, setActivePresetId] = useState<string | null>(savedPresetId)
 
   const activate = (preset: Preset) => {
     setActivePresetId(preset.id)
-    localStorage.setItem('hermes-active-preset', JSON.stringify(preset))
+    try {
+      localStorage.setItem('hermes-active-preset', JSON.stringify(preset))
+    } catch {
+      // localStorage unavailable (private mode, quota exceeded)
+    }
   }
 
   return (
