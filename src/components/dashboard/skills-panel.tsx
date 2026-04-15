@@ -56,7 +56,8 @@ export function SkillsPanel() {
   const filtered = skills.filter((s) => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
       s.description.toLowerCase().includes(search.toLowerCase())
-    const matchesSource = sourceFilter === 'all' || s.source === sourceFilter
+    const matchesSource = sourceFilter === 'all' ||
+      s.source.toLowerCase() === sourceFilter.toLowerCase()
     return matchesSearch && matchesSource
   })
 
