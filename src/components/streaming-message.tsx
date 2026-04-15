@@ -68,6 +68,7 @@ export function StreamingMessage({ message, onRegenerate, onBranch }: Props) {
       <div className="mt-3 flex gap-2">
         {message.role === 'user' && onBranch && (
           <button
+            type="button"
             onClick={() => onBranch(message.id)}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
             title="Branch from this message"
@@ -77,6 +78,7 @@ export function StreamingMessage({ message, onRegenerate, onBranch }: Props) {
         )}
         {message.role === 'assistant' && message.status !== 'streaming' && onRegenerate && (
           <button
+            type="button"
             onClick={() => onRegenerate(message.id)}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
             title="Regenerate"
@@ -86,6 +88,7 @@ export function StreamingMessage({ message, onRegenerate, onBranch }: Props) {
         )}
         {message.content && (
           <button
+            type="button"
             onClick={() => copy(message.content)}
             className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
             title="Copy"
