@@ -1,0 +1,4 @@
+notebooks:
+  - id: research
+    name: Research
+    mode: research
