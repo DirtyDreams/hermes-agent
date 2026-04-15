@@ -90,18 +90,36 @@ export function WorkspacePanel() {
       {/* Breadcrumb */}
       {selectedPath && (
         <div className="flex items-center gap-1 px-4 py-2 text-xs text-slate-400 border-b border-slate-800 overflow-x-auto">
-          {workdirSegments.map((seg, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <span>{seg}</span>
-              <span>/</span>
-            </span>
-          ))}
-          {segments.map((seg, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <span>{seg}</span>
-              <span>/</span>
-            </span>
-          ))}
+          {workdirSegments.map((seg, i) => {
+            const segPath = workdirSegments.slice(0, i + 1).join('/')
+            return (
+              <span key={i} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPath(segPath)}
+                  className="hover:text-emerald-300 transition"
+                >
+                  {seg}
+                </button>
+                <span>/</span>
+              </span>
+            )
+          })}
+          {segments.map((seg, i) => {
+            const segPath = [...workdirSegments, ...segments.slice(0, i + 1)].join('/')
+            return (
+              <span key={`seg-${i}`} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSelectedPath(segPath)}
+                  className="hover:text-emerald-300 transition"
+                >
+                  {seg}
+                </button>
+                <span>/</span>
+              </span>
+            )
+          })}
           <span className="text-white font-medium">{selectedPath.split('/').pop()}</span>
         </div>
       )}
@@ -137,10 +155,18 @@ export function WorkspacePanel() {
                 onChange={(e) => setNewItemPath(e.target.value)}
                 className="flex-1 bg-slate-950/80 text-slate-100 text-sm"
                 autoFocus
-                onKeyDown={(e) => {
+                onKeyDown={async (e) => {
                   if (e.key === 'Enter') {
-                    if (newItemMode === 'file') void handleCreateFile(workdir)
-                    else void handleCreateDir(workdir)
+                    const name = newItemPath.trim()
+                    if (!name) return
+                    const base = workdir || selectedPath?.split('/').slice(0, -1).join('/') || ''
+                    const path = `${base}/${name}`.replace(/\/+/g, '/')
+                    if (newItemMode === 'file') {
+                      await writeFile(path, '')
+                      setSelectedPath(path)
+                    } else {
+                      await mkdir(path)
+                    }
                     setNewItemMode(null)
                     setNewItemPath('')
                   }
