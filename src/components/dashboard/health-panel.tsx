@@ -7,7 +7,7 @@ import { X, Clock, CheckCircle, XCircle, Loader2, RefreshCw } from 'lucide-react
 import { cn } from '../../lib/utils'
 
 export function HealthPanel() {
-  const health = useHealth()
+  const { health } = useHealth()
   const { jobs, loading: jobsLoading, refresh, cancel } = useJobs()
 
   const statusBadge = (status: string) => {
