@@ -448,8 +448,15 @@ const toolEmitter = new EventEmitter()
 app.post('/api/chat/stream', async (req: Request, res: Response) => {
   const payload = req.body as ChatRequest
 
+  const MAX_MESSAGE_LENGTH = 100_000 // 100KB
+
   if (!payload?.message || typeof payload.message !== 'string') {
     res.status(400).json({ error: 'Field "message" is required.' })
+    return
+  }
+
+  if (payload.message.length > MAX_MESSAGE_LENGTH) {
+    res.status(400).json({ error: `Message too long (max ${MAX_MESSAGE_LENGTH} bytes).` })
     return
   }
 
@@ -457,7 +464,16 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders()
+
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n')
+    } catch {
+      clearInterval(heartbeat)
+    }
+  }, 30000)
 
   const args = buildHermesArgs(payload)
   const startedAt = Date.now()
@@ -474,7 +490,7 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
   child.stdout.on('data', (chunk: Buffer) => {
     const text = chunk.toString()
     stdout += text
-    res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`)
+    try { res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`) } catch { /* client disconnected */ }
   })
 
   child.stderr.on('data', (chunk: Buffer) => {
@@ -483,37 +499,41 @@ app.post('/api/chat/stream', async (req: Request, res: Response) => {
     try {
       const parsed = JSON.parse(text)
       if (parsed.type === 'tool_call') {
-        res.write(`data: ${JSON.stringify({ type: 'tool_call', data: parsed })}\n\n`)
+        try { res.write(`data: ${JSON.stringify({ type: 'tool_call', data: parsed })}\n\n`) } catch { /* client disconnected */ }
         toolEmitter.emit('tool_call', parsed)
       } else if (parsed.type === 'tool_result') {
-        res.write(`data: ${JSON.stringify({ type: 'tool_result', data: parsed })}\n\n`)
+        try { res.write(`data: ${JSON.stringify({ type: 'tool_result', data: parsed })}\n\n`) } catch { /* client disconnected */ }
         toolEmitter.emit('tool_result', parsed)
       }
     } catch {
-      res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`)
+      try { res.write(`data: ${JSON.stringify({ type: 'token', data: text })}\n\n`) } catch { /* client disconnected */ }
     }
   })
 
   const timeout = setTimeout(() => {
+    clearInterval(heartbeat)
     child.kill('SIGTERM')
-    res.write(`data: ${JSON.stringify({ type: 'error', data: 'Timeout' })}\n\n`)
+    try { res.write(`data: ${JSON.stringify({ type: 'error', data: 'Timeout' })}\n\n`) } catch { /* client disconnected */ }
     res.end()
   }, payload.timeoutMs ?? 240_000)
 
   child.on('close', (exitCode) => {
+    clearInterval(heartbeat)
     clearTimeout(timeout)
     const durationMs = Date.now() - startedAt
-    res.write(`data: ${JSON.stringify({ type: 'done', data: { exitCode, durationMs } })}\n\n`)
+    try { res.write(`data: ${JSON.stringify({ type: 'done', data: { exitCode, durationMs } })}\n\n`) } catch { /* client disconnected */ }
     res.end()
   })
 
   child.on('error', (error) => {
+    clearInterval(heartbeat)
     clearTimeout(timeout)
-    res.write(`data: ${JSON.stringify({ type: 'error', data: error.message })}\n\n`)
+    try { res.write(`data: ${JSON.stringify({ type: 'error', data: error.message })}\n\n`) } catch { /* client disconnected */ }
     res.end()
   })
 
   req.on('close', () => {
+    clearInterval(heartbeat)
     clearTimeout(timeout)
     child.kill('SIGTERM')
   })
@@ -524,6 +544,7 @@ app.get('/api/chat/tool-events', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders()
 
   const onToolCall = (data: unknown) => {
