@@ -20,6 +20,7 @@ export function useSessions() {
     setError(null)
     try {
       const res = await fetch('/api/sessions/list')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { sessions?: Session[]; error?: string }
       if (data.error) {
         setError(data.error)
@@ -46,6 +47,7 @@ export function useSessions() {
       })
       const data = await res.json() as { session?: Session; error?: string }
       if (data.error) throw new Error(data.error)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       await reload()
       return data.session ?? null
     } catch (e) {
@@ -61,6 +63,7 @@ export function useSessions() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { error?: string }
       if (data.error) throw new Error(data.error)
       await reload()
@@ -76,6 +79,7 @@ export function useSessions() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ archived }),
       })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { error?: string }
       if (data.error) throw new Error(data.error)
       await reload()
@@ -88,6 +92,7 @@ export function useSessions() {
     try {
       const url = hard ? `/api/sessions/${id}?hard=true` : `/api/sessions/${id}`
       const res = await fetch(url, { method: 'DELETE' })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json() as { error?: string }
       if (data.error) throw new Error(data.error)
       await reload()
@@ -104,6 +109,7 @@ export function useSessions() {
 
   const search = useCallback(async (q: string): Promise<Session[]> => {
     const res = await fetch(`/api/sessions/search?q=${encodeURIComponent(q)}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json() as { sessions?: Session[]; error?: string }
     if (data.error) throw new Error(data.error)
     return data.sessions ?? []
