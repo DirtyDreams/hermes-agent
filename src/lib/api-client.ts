@@ -48,13 +48,14 @@ export async function* streamChat(
   payload: ChatPayload,
   onToolCall?: (name: string, params: Record<string, unknown>) => void,
   onToolResult?: (name: string, result: string) => void,
+  signal?: AbortSignal,
 ): AsyncGenerator<string, void, unknown> {
   const controller = new AbortController()
   const response = await fetch('/api/chat/stream', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
-    signal: controller.signal,
+    signal: signal ?? controller.signal,
   })
 
   if (!response.ok) {

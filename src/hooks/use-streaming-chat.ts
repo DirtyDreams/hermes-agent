@@ -39,6 +39,7 @@ export function useStreamingChat(defaultPayload: Omit<ChatPayload, 'message'>): 
 
   const cancelStream = useCallback(() => {
     abortControllerRef.current?.abort()
+    abortControllerRef.current = null
     setIsStreaming(false)
     setMessages((prev) =>
       prev.map((m) => (m.status === 'streaming' ? { ...m, status: 'error' as const } : m)),
@@ -47,6 +48,10 @@ export function useStreamingChat(defaultPayload: Omit<ChatPayload, 'message'>): 
 
   const sendMessage = useCallback(
     async (prompt: string, payload: Omit<ChatPayload, 'message'>) => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+
       const userMsg: Message = {
         id: crypto.randomUUID(),
         role: 'user',
@@ -95,6 +100,7 @@ export function useStreamingChat(defaultPayload: Omit<ChatPayload, 'message'>): 
               prev.map((tc) => (tc.name === name ? { ...tc, status: 'done', result } : tc)),
             )
           },
+          controller.signal,
         )) {
           if (controller.signal.aborted) break
           contentRef.current += token
