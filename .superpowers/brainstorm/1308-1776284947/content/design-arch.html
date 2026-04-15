@@ -1,0 +1,47 @@
+<h2>Design — Section 1: Overall Architecture</h2>
+<p class="subtitle">High-level system structure</p>
+
+<div class="section">
+<p>The app has two main tracks running in parallel, sharing a common React component library:</p>
+</div>
+
+<div class="split">
+  <div>
+    <h3>Track A — Chat Infrastructure</h3>
+    <ul>
+      <li>Real-time token streaming via SSE (Server-Sent Events)</li>
+      <li>Backend spawns <code>hermes chat</code> with streaming output parsed token-by-token</li>
+      <li>Tool Activity side panel (WebSocket or polling for live tool events)</li>
+      <li>New chat message components with token-by-token rendering</li>
+      <li>Message state machine: idle → sending → streaming → complete | error</li>
+    </ul>
+  </div>
+  <div>
+    <h3>Track B — Agent Dashboard</h3>
+    <ul>
+      <li>Read-only API-driven panels: skills, MCP tools, system health</li>
+      <li>Hermes CLI commands: <code>hermes skills list</code>, <code>hermes tools list</code>, <code>hermes system info</code></li>
+      <li>Provider/model preset management via config file editing (reuse existing /api/config/*)</li>
+      <li>Batch job status via <code>hermes jobs list</code></li>
+    </ul>
+  </div>
+</div>
+
+<h3>Frontend Shared Layer</h3>
+<div class="section">
+  <ul>
+    <li><strong>Layout context</strong> — collapsible sidebar state, active panel (chat/dashboard), overlay open/close state</li>
+    <li><strong>HermesAPI client</strong> — typed fetch wrapper for all /api/* calls including new SSE endpoint</li>
+    <li><strong>Component library</strong> — existing UI primitives in <code>src/components/ui/</code> extended with new ones</li>
+  </ul>
+</div>
+
+<h3>Backend Changes</h3>
+<div class="section">
+  <ul>
+    <li><strong>New: SSE endpoint</strong> — <code>POST /api/chat/stream</code> — spawns hermes and streams tokens back as SSE events</li>
+    <li><strong>New: Tool events</strong> — <code>GET /api/chat/tool-events</code> — SSE stream of tool calls and their status</li>
+    <li><strong>New: Skills/Tools</strong> — <code>GET /api/skills/list</code>, <code>GET /api/tools/list</code>, <code>GET /api/system/health</code>, <code>GET /api/jobs/list</code></li>
+    <li><strong>Existing endpoints preserved</strong> — health, config read/write, sessions list, chat send (fallback)</li>
+  </ul>
+</div>

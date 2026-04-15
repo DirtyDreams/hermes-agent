@@ -1,0 +1,43 @@
+<h2>Design — Section 3: Track C — Session Management</h2>
+<p class="subtitle">Full session lifecycle, export, search</p>
+
+<h3>Backend Endpoints</h3>
+<div class="section">
+  <ul>
+    <li><code>GET /api/sessions/list</code> — existing, enhanced to include: date grouping metadata, archive status</li>
+    <li><code>POST /api/sessions/create</code> — creates new Hermes session, returns session ID + title</li>
+    <li><code>PATCH /api/sessions/:id</code> — rename session, update color/tag, archive/unarchive</li>
+    <li><code>DELETE /api/sessions/:id</code> — soft-delete (archive) or hard-delete</li>
+    <li><code>GET /api/sessions/:id/export</code> — returns full transcript as Markdown or JSON</li>
+    <li><code>GET /api/sessions/search?q=</code> — search session titles and content via Hermes</li>
+  </ul>
+</div>
+
+<h3>Session Picker (Sidebar)</h3>
+<div class="section">
+  <ul>
+    <li><strong>Current behavior</strong>: simple dropdown of session options — replaced with a proper session list panel</li>
+    <li><strong>Session list panel</strong>: collapsible section in the sidebar showing all sessions grouped by date (Today, Yesterday, Earlier, Archived)</li>
+    <li><strong>Per-session actions</strong>: hover reveals icon buttons — rename (pencil), duplicate, archive, delete</li>
+    <li><strong>New session button</strong>: prominent "+" button at top, creates and immediately switches to new session</li>
+    <li><strong>Session color/tag</strong>: optional color dot and short tag label for visual grouping</li>
+  </ul>
+</div>
+
+<h3>Session Search</h3>
+<div class="section">
+  <ul>
+    <li>Search bar at top of session list — queries Hermes session index</li>
+    <li>Results show matching sessions with highlighted content snippets</li>
+    <li>Filters: All | Archived | By tag/color</li>
+  </ul>
+</div>
+
+<h3>Export</h3>
+<div class="section">
+  <ul>
+    <li>Per-session export button: downloads <code>.md</code> or <code>.json</code> file</li>
+    <li>Format: Markdown includes metadata header (session ID, date, model), then role-labeled message blocks</li>
+    <li>JSON format includes full structured data for re-import</li>
+  </ul>
+</div>

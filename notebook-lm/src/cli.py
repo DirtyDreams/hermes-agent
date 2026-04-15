@@ -3,7 +3,7 @@
 import argparse
 import sys
 
-from .wrapper import create_notebook, get_notebook_state, list_notebooks
+from .wrapper import add_source, create_notebook, get_notebook_state, list_notebooks
 
 
 def main() -> int:
@@ -19,6 +19,11 @@ def main() -> int:
 
     # status
     subparsers.add_parser("status", help="Show status")
+
+    # add-source <notebook_id> <source>
+    add_source_parser = subparsers.add_parser("add-source", help="Add a source to a notebook")
+    add_source_parser.add_argument("notebook_id", help="Notebook ID")
+    add_source_parser.add_argument("source", help="URL or file path to add as source")
 
     args = parser.parse_args()
 
@@ -36,6 +41,12 @@ def main() -> int:
     if args.command == "status":
         notebooks = list_notebooks()
         print(f"notebook-lm: {len(notebooks)} notebook(s)")
+        return 0
+
+    if args.command == "add-source":
+        result = add_source(args.notebook_id, args.source)
+        print(f"Source added: {args.source}")
+        print(f"Status: {result.get('status', 'unknown')}")
         return 0
 
     return 0

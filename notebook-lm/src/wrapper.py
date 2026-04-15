@@ -48,3 +48,21 @@ def get_notebook_state(notebook_id: str) -> dict[str, Any]:
     if not isinstance(result, dict):
         raise RuntimeError("get_notebook_state: expected dict response")
     return result
+
+
+def add_source(notebook_id: str, source: str) -> dict[str, Any]:
+    """Add a source (URL, PDF path, etc.) to a notebook.
+
+    Args:
+        notebook_id: The notebook ID (e.g., from create output)
+        source: URL or file path to add as source
+
+    Returns:
+        dict with status info
+    """
+    if not notebook_id or not notebook_id.strip():
+        raise ValueError("add_source: notebook_id cannot be empty")
+    if not source or not source.strip():
+        raise ValueError("add_source: source cannot be empty")
+    output = run(["notebook", "add-source", notebook_id, source, "--json"])
+    return output

@@ -1,0 +1,46 @@
+<h2>Design — Section 4: Track C — Workspace File Browser</h2>
+<p class="subtitle">Full file explorer with git detection and preview</p>
+
+<h3>Backend Endpoints</h3>
+<div class="section">
+  <ul>
+    <li><code>GET /api/workspace/tree</code> — returns directory tree starting from Hermes working directory</li>
+    <li><code>GET /api/workspace/read?path=</code> — returns file content (text, code) or image as base64</li>
+    <li><code>PUT /api/workspace/write</code> — create or overwrite file at given path</li>
+    <li><code>DELETE /api/workspace/delete?path=</code> — delete file or directory</li>
+    <li><code>POST /api/workspace/mkdir</code> — create directory</li>
+    <li><code>GET /api/workspace/git</code> — returns git branch name and dirty file count</li>
+  </ul>
+</div>
+
+<h3>File Browser Panel (Overlay)</h3>
+<div class="section">
+  <ul>
+    <li><strong>Trigger</strong>: "Files" icon button in the chat header — opens as right-side overlay panel</li>
+    <li><strong>Header</strong>: current directory breadcrumb (clickable segments), git branch + dirty indicator</li>
+    <li><strong>Directory tree</strong>: collapsible tree view, lazy-loaded on expand, folders/files have distinct icons</li>
+    <li><strong>Context menu</strong>: right-click (or long-press) on any item: New File, New Folder, Rename, Delete</li>
+    <li><strong>Search</strong>: filter files by name within current tree</li>
+  </ul>
+</div>
+
+<h3>File Preview</h3>
+<div class="section">
+  <ul>
+    <li><strong>Click a file</strong>: preview panel slides in from the right (or takes the main area on mobile)</li>
+    <li><strong>Text/code files</strong>: syntax-highlighted via a lightweight highlighter (Prism or highlight.js)</li>
+    <li><strong>Markdown</strong>: rendered preview</li>
+    <li><strong>Images</strong>: displayed inline with actual dimensions</li>
+    <li><strong>Edit mode</strong>: "Edit" button switches to textarea; "Save" calls PUT /api/workspace/write</li>
+    <li><strong>Large files</strong>: truncated at 500 lines with "Load more" or "Download" option</li>
+  </ul>
+</div>
+
+<h3>Git Detection</h3>
+<div class="section">
+  <ul>
+    <li>Calls <code>GET /api/workspace/git</code> on panel open and on file change</li>
+    <li>Shows branch name badge (e.g., "main") + orange dot if dirty (uncommitted changes)</li>
+    <li>No git operations (commit, push) — read-only detection only</li>
+  </ul>
+</div>

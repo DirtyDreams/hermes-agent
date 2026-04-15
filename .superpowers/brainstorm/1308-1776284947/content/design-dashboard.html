@@ -1,0 +1,55 @@
+<h2>Design — Section 5: Track B — Agent Dashboard</h2>
+<p class="subtitle">Skills browser, MCP tools, presets, batch jobs, health</p>
+
+<h3>Backend Endpoints</h3>
+<div class="section">
+  <ul>
+    <li><code>GET /api/skills/list</code> — lists all installed Hermes skills (reads from <code>~/.hermes/skills/</code>)</li>
+    <li><code>GET /api/mcp/tools</code> — lists connected MCP servers and their available tools</li>
+    <li><code>GET /api/providers/list</code> — lists available providers/models from Hermes config</li>
+    <li><code>GET /api/system/health</code> — enhanced: adds memory usage, Hermes uptime, active model</li>
+    <li><code>GET /api/jobs/list</code> — lists scheduled/active batch jobs from Hermes</li>
+    <li><code>POST /api/jobs/cancel/:id</code> — cancels a running or scheduled job</li>
+  </ul>
+</div>
+
+<h3>Skills Browser Panel</h3>
+<div class="section">
+  <ul>
+    <li><strong>Trigger</strong>: "Skills" tab in the dashboard overlay</li>
+    <li><strong>Skill card</strong>: name, description, trigger phrase (if any), source (built-in / user / marketplace)</li>
+    <li><strong>Search/filter</strong>: text search across name + description, filter by source tag</li>
+    <li><strong>Skill detail</strong>: click card to expand — shows full description, instructions, example prompts</li>
+    <li><strong>Enable/disable</strong>: toggle to add/remove skill from active configuration</li>
+  </ul>
+</div>
+
+<h3>MCP Tools Panel</h3>
+<div class="section">
+  <ul>
+    <li><strong>Server list</strong>: each connected MCP server as a collapsible section</li>
+    <li><strong>Per-server tools</strong>: nested list of tool names + brief descriptions</li>
+    <li><strong>Tool invocation</strong>: click a tool to see its schema (input parameters) — read-only</li>
+    <li><strong>Status badge</strong>: <code>connected</code> / <code>error</code> / <code>connecting</code> per server</li>
+  </ul>
+</div>
+
+<h3>Provider / Model Presets</h3>
+<div class="section">
+  <ul>
+    <li><strong>Preset cards</strong>: visually distinct cards for each configured provider/model combo</li>
+    <li><strong>Quick activate</strong>: click a preset card to immediately apply it (updates settings, restarts session if needed)</li>
+    <li><strong>Preset editor</strong>: "Edit" button on each card opens a modal to modify provider, model, toolsets, custom flags</li>
+    <li><strong>Add new</strong>: "+ Add Preset" card at the end</li>
+    <li>Current app already has 3 presets (local, openrouter, codex) — these become visual preset cards</li>
+  </ul>
+</div>
+
+<h3>System Health & Batch Jobs</h3>
+<div class="section">
+  <ul>
+    <li><strong>System health</strong>: memory usage bar, Hermes uptime, active model name, Hermes version, config path — all in one compact status card</li>
+    <li><strong>Batch jobs</strong>: list of scheduled/running jobs with: job ID, trigger type (cron / manual), status (<code>scheduled</code> / <code>running</code> / <code>done</code> / <code>failed</code>), next run time</li>
+    <li><strong>Job cancel</strong>: cancel button per job</li>
+  </ul>
+</div>

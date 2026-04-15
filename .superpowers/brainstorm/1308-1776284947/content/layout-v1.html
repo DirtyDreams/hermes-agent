@@ -1,0 +1,33 @@
+<h2>Overall Layout Direction</h2>
+<p class="subtitle">Choose the primary structure for the combined WebUI + Agent Dashboard</p>
+
+<div class="options">
+  <div class="option" data-choice="three-panel" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Three-Panel (Reference: nesquena/hermes-webui)</h3>
+      <p>Left sidebar: sessions + navigation. Center: chat. Right: workspace file browser.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="two-panel" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Two-Panel + Dashboard Tab</h3>
+      <p>Left sidebar: sessions/nav. Main area: chat OR dashboard (tab-switched). File browser as a slide-over panel.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="tabbed" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Tabbed Single-Column</h3>
+      <p>Top-level tabs: Chat | Sessions | Dashboard | Settings. No persistent sidebar. File browser inline per section.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>Hybrid: Collapsible Sidebar</h3>
+      <p>Minimal icon sidebar that expands. Chat center stage. Dashboard and file browser as overlay panels. Mobile-friendly.</p>
+    </div>
+  </div>
+</div>

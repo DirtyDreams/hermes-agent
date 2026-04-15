@@ -1,0 +1,45 @@
+<h2>Design — Section 2: Track A — Core Chat Enhancement</h2>
+<p class="subtitle">Streaming, tool panel, message lifecycle</p>
+
+<h3>Backend: Streaming Endpoint</h3>
+<div class="section">
+  <p><code>POST /api/chat/stream</code></p>
+  <ul>
+    <li>Accepts same payload as <code>/api/chat/send</code></li>
+    <li>Spawns <code>hermes chat</code> child process with output piped to a parser</li>
+    <li>Emits SSE events: <code>token</code>, <code>tool_call</code>, <code>tool_result</code>, <code>done</code>, <code>error</code></li>
+    <li>Streams tokens immediately as they're emitted — no buffering</li>
+    <li>Timeout handling: kills process after <code>timeoutMs</code>, emits <code>error</code> event</li>
+  </ul>
+</div>
+
+<h3>Frontend: Streaming Message Component</h3>
+<div class="section">
+  <ul>
+    <li><strong>Message state</strong>: <code>idle | streaming | complete | error</code></li>
+    <li><strong>Token rendering</strong>: each token appends to content via <code>useRef</code> on the pre element — no re-renders per token</li>
+    <li><strong>Typing indicator</strong>: shows "..." or animated dots while waiting for first token</li>
+    <li><strong>Tool calls</strong>: detected from <code>tool_call</code> SSE events, passed up to Tool Activity panel</li>
+    <li><strong>Regenerate</strong>: re-sends the user message, replaces the assistant's incomplete message in-place</li>
+    <li><strong>Cancel</strong>: aborts the in-flight request, marks message as <code>error</code> with "Cancelled"</li>
+  </ul>
+</div>
+
+<h3>Tool Activity Side Panel</h3>
+<div class="section">
+  <ul>
+    <li><strong>Trigger</strong>: opens as an overlay/drawer from the right edge when first tool call fires</li>
+    <li><strong>Tool card</strong>: shows tool name, params (collapsible), status badge: <code>running | done | error</code></li>
+    <li><strong>Result preview</strong>: collapsible accordion showing truncated result</li>
+    <li><strong>Auto-close</strong>: collapses when all tool calls in a turn are complete</li>
+    <li><strong>Collapsed state</strong>: small pulsing indicator on right edge when tools are running</li>
+  </ul>
+</div>
+
+<h3>Message Editing</h3>
+<div class="section">
+  <ul>
+    <li>Click on any user or assistant message to "branch" — creates a copy in the composer that can be edited and re-sent</li>
+    <li>Re-send from a branched message creates a new turn, doesn't destroy subsequent history</li>
+  </ul>
+</div>

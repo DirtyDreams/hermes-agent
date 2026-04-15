@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node \"C:\\\\Users\\\\coyot\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"c:\\\\Users\\\\coyot\\\\Desktop\\\\testy\")",
+      "Bash(node \"C:\\\\Users\\\\coyot\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\skills\\\\brainstorming\\\\scripts\\\\server.cjs\" --project-dir \"c:\\\\Users\\\\coyot\\\\Desktop\\\\testy\")",
+      "Bash(bash \"C:\\\\Users\\\\coyot\\\\.claude\\\\plugins\\\\cache\\\\claude-plugins-official\\\\superpowers\\\\5.0.7\\\\skills\\\\brainstorming\\\\scripts\\\\start-server.sh\" --project-dir \"c:\\\\Users\\\\coyot\\\\Desktop\\\\testy\")",
+      "Read(//c/Users/coyot/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/subagent-driven-development/**)",
+      "Read(//c/Users/coyot/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/requesting-code-review/**)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:8787/api/skills/list)",
+      "Bash(curl -s http://localhost:8787/api/mcp/tools)",
+      "Bash(curl -s http://localhost:8787/api/system/health)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(npx tsx *)",
+      "Bash(pkill -f \"tsx server/index.ts\")",
+      "Bash(tasklist)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill //F //PID 5920)",
+      "Bash(taskkill //F //PID 14524)",
+      "Bash(curl -s http://localhost:8787/api/providers/list)",
+      "Bash(curl -s http://localhost:8787/api/jobs/list)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)",
+      "Bash(curl -X POST http://localhost:8787/api/chat/stream -H \"Content-Type: application/json\" -d '{\"message\": \"test\", \"timeoutMs\": 5000}' --no-buffer)",
+      "Bash(curl -s http://localhost:8787/api/health)",
+      "Read(//c/Users/coyot/AppData/Local/Temp/claude/c--Users-coyot-Desktop-testy/ec2986b4-c9c5-4bf7-b17d-b20d3b8b4f07/tasks/**)",
+      "Bash(pkill -f \"npm run dev\")",
+      "Bash(sed -n '10,11p' src/App.tsx)",
+      "Bash(sed -n '426,430p' src/App.tsx)",
+      "Bash(sed -n '556,560p' src/App.tsx)",
+      "Bash(npx tsc *)",
+      "Bash(ls *.json)"
+    ]
+  }
+}
