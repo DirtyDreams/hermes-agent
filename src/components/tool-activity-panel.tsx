@@ -10,7 +10,7 @@ type Props = {
 }
 
 export function ToolActivityPanel({ toolCalls, isStreaming }: Props) {
-  const { activePanel, closePanel } = useLayout()
+  const { activePanel, closePanel, openPanel } = useLayout()
   const isOpen = activePanel === 'toolActivity'
 
   return (
@@ -18,7 +18,7 @@ export function ToolActivityPanel({ toolCalls, isStreaming }: Props) {
       {/* Collapsed pulsing indicator */}
       {!isOpen && (isStreaming || toolCalls.length > 0) && (
         <button
-          onClick={() => useLayout().openPanel('toolActivity')}
+          onClick={() => openPanel('toolActivity')}
           className="fixed right-0 top-1/2 z-40 flex h-12 w-6 items-center justify-center rounded-l-full bg-emerald-500 shadow-lg hover:bg-emerald-400"
           title="Tool Activity"
         >
