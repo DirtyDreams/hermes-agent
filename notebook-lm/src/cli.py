@@ -34,7 +34,8 @@ def main() -> int:
         return 0
 
     if args.command == "status":
-        print("notebook-lm ready")
+        notebooks = list_notebooks()
+        print(f"notebook-lm: {len(notebooks)} notebook(s)")
         return 0
 
     return 0

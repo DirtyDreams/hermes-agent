@@ -15,6 +15,7 @@ def run(args: list[str]) -> dict[str, Any]:
             capture_output=True,
             text=True,
             check=True,
+            timeout=60,
         )
         return json.loads(result.stdout)
     except (subprocess.CalledProcessError, json.JSONDecodeError, FileNotFoundError) as e:
@@ -31,6 +32,8 @@ def list_notebooks() -> list[dict[str, Any]]:
 
 def create_notebook(name: str) -> dict[str, Any]:
     """Create a new notebook with the given name."""
+    if not name or not name.strip():
+        raise ValueError("create_notebook: name cannot be empty")
     result = run(["create", name, "--format", "json"])
     if not isinstance(result, dict):
         raise RuntimeError("create_notebook: expected dict response")
@@ -39,6 +42,8 @@ def create_notebook(name: str) -> dict[str, Any]:
 
 def get_notebook_state(notebook_id: str) -> dict[str, Any]:
     """Get the current state of a notebook."""
+    if not notebook_id or not notebook_id.strip():
+        raise ValueError("get_notebook_state: notebook_id cannot be empty")
     result = run(["state", notebook_id, "--format", "json"])
     if not isinstance(result, dict):
         raise RuntimeError("get_notebook_state: expected dict response")

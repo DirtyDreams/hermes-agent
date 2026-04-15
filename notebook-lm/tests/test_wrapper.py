@@ -16,7 +16,6 @@ def test_list_notebooks_returns_list():
     # This will fail against real CLI if not mocked, but shows the contract
     try:
         result = list_notebooks()
-        assert isinstance(result, list)
-    except RuntimeError:
-        # Expected if CLI not available or returns unexpected output
-        pass
+    except RuntimeError as e:
+        pytest.skip(f"CLI not available or returned unexpected output: {e}")
+    assert isinstance(result, list)
