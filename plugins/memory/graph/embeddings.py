@@ -18,9 +18,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Dimension of the hash-bucketed bag-of-words fallback vector.
+# Dimension of the hash-bucketed bag-of-words fallback vector used when
+# sentence-transformers is unavailable. Sentence-transformer embeddings have
+# their own model-dependent dimensionality (e.g. 384 for all-MiniLM-L6-v2).
 # 256 buckets give sufficient resolution for typical vocabulary sizes while
-# keeping memory usage low (one float per bucket, shared across documents).
+# keeping memory usage low (one float per bucket).
 _KEYWORD_VECTOR_DIM = 256
 
 # ---------------------------------------------------------------------------

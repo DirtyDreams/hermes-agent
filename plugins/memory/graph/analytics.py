@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Optional
 from .graph_store import GraphStore
 from .decay_calculator import TemporalDecay
 
+# Number of days included in the temporal trend chart.
+_TEMPORAL_TREND_DAYS = 30
+
 
 class MemoryAnalytics:
     """Compute analytics over a GraphStore instance."""
@@ -98,7 +101,7 @@ class MemoryAnalytics:
                 pass
 
         trend = [{"date": day, "count": cnt}
-                 for day, cnt in sorted(day_counts.items(), reverse=True)[:30]]
+                 for day, cnt in sorted(day_counts.items(), reverse=True)[:_TEMPORAL_TREND_DAYS]]
         return trend
 
     def _forgotten_memories(self, entities: List[Dict[str, Any]], n: int = 5) -> List[Dict[str, Any]]:

@@ -45,6 +45,9 @@ logger = logging.getLogger(__name__)
 
 _ENTITY_PATTERN = re.compile(r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b')
 
+# Maximum number of entities auto-extracted per turn (caps processing cost).
+_MAX_AUTO_EXTRACTED_ENTITIES = 10
+
 
 def _extract_entities_simple(text: str) -> List[str]:
     """Heuristic: extract capitalised multi-word phrases as candidate entities.
@@ -52,7 +55,7 @@ def _extract_entities_simple(text: str) -> List[str]:
     This is intentionally lightweight — no NLP deps.  False positives are
     acceptable; the graph simply learns harmless nodes.
     """
-    return list(dict.fromkeys(_ENTITY_PATTERN.findall(text)))[:10]
+    return list(dict.fromkeys(_ENTITY_PATTERN.findall(text)))[:_MAX_AUTO_EXTRACTED_ENTITIES]
 
 
 def _load_plugin_config(hermes_home: Optional[str] = None) -> Dict[str, Any]:

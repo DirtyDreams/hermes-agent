@@ -30,6 +30,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Maximum characters kept for an event's label field (content is stored in full).
+_EVENT_LABEL_MAX_LENGTH = 120
+
 # ---------------------------------------------------------------------------
 # Backend detection
 # ---------------------------------------------------------------------------
@@ -263,7 +266,7 @@ class GraphStore:
         self._graph.add_node(
             event_id,
             type="event",
-            label=content[:120],  # truncate for readability
+            label=content[:_EVENT_LABEL_MAX_LENGTH],  # truncate for readability
             content=content,
             created_at=now,
             updated_at=now,
