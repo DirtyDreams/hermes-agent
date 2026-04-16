@@ -962,6 +962,130 @@ def do_snapshot_import(input_path: str, force: bool = False,
 
 
 # ---------------------------------------------------------------------------
+# Version pinning & rollback
+# ---------------------------------------------------------------------------
+
+def do_pin(name: str, version: str, console: Optional[Console] = None) -> None:
+    """Pin skill *name* to *version*."""
+    from tools.skills_hub import HubLockFile
+    c = console or _console
+    lock = HubLockFile()
+    if not lock.is_hub_installed(name):
+        c.print(f"[bold red]Error:[/] '{name}' is not a hub-installed skill.\n")
+        return
+    if lock.pin_version(name, version):
+        c.print(f"[bold green]Pinned:[/] {name} → {version}\n")
+        c.print("[dim]Run /skills update to downgrade if needed.[/]\n")
+    else:
+        c.print(f"[bold red]Error:[/] Could not pin '{name}'.\n")
+
+
+def do_unpin(name: str, console: Optional[Console] = None) -> None:
+    """Remove a version pin from skill *name*."""
+    from tools.skills_hub import HubLockFile
+    c = console or _console
+    lock = HubLockFile()
+    if not lock.is_hub_installed(name):
+        c.print(f"[bold red]Error:[/] '{name}' is not a hub-installed skill.\n")
+        return
+    if lock.unpin_version(name):
+        c.print(f"[bold green]Unpinned:[/] {name} will now track the latest version.\n")
+    else:
+        c.print(f"[bold red]Error:[/] Could not unpin '{name}'.\n")
+
+
+def do_rollback(name: str, console: Optional[Console] = None) -> None:
+    """Roll *name* back to its previous version."""
+    from tools.skills_hub import HubLockFile
+    c = console or _console
+    lock = HubLockFile()
+    entry = lock.get_installed(name)
+    if not entry:
+        c.print(f"[bold red]Error:[/] '{name}' is not a hub-installed skill.\n")
+        return
+    history = lock.get_version_history(name)
+    if not history:
+        c.print(f"[yellow]No version history for '{name}'. Cannot roll back.[/]\n")
+        return
+    prev = history[-1]
+    c.print(f"Rolling back [bold]{name}[/] from {entry.get('version', '?')} → {prev}")
+    lock.pin_version(name, prev)
+    do_update(name=name, console=c)
+    c.print(f"[bold green]Rollback complete:[/] {name} is now at {prev}\n")
+
+
+# ---------------------------------------------------------------------------
+# Marketplace commands
+# ---------------------------------------------------------------------------
+
+def do_marketplace(action: str = "featured", args_list: Optional[list] = None,
+                   console: Optional[Console] = None) -> None:
+    """Handle marketplace sub-commands (featured, rate, analytics)."""
+    from skills.marketplace import get_client, get_analytics
+    c = console or _console
+    args_list = args_list or []
+
+    if action == "featured":
+        client = get_client()
+        if not client.is_configured():
+            c.print("[yellow]Marketplace not configured.[/] "
+                    "Set [bold]HERMES_MARKETPLACE_URL[/] to enable.\n")
+            c.print("[dim]Showing local analytics instead:[/]")
+            do_marketplace("analytics", console=c)
+            return
+        featured = client.get_featured()
+        if not featured:
+            c.print("[dim]No featured skills available right now.[/]\n")
+            return
+        table = Table(title="⭐ Featured Skills")
+        table.add_column("Skill", style="bold cyan")
+        table.add_column("Stars", style="yellow")
+        table.add_column("Installs")
+        for r in featured:
+            table.add_row(r.skill_name, f"{'★' * round(r.stars):<5} {r.stars:.1f}", str(r.installs))
+        c.print(table)
+
+    elif action == "rate":
+        if len(args_list) < 2:
+            c.print("[bold red]Usage:[/] skills marketplace rate <name> <stars>\n")
+            return
+        skill_name = args_list[0]
+        try:
+            stars = float(args_list[1])
+        except ValueError:
+            c.print("[bold red]Error:[/] Stars must be a number 0–5.\n")
+            return
+        analytics = get_analytics()
+        analytics.record_rating(skill_name, stars)
+        client = get_client()
+        if client.is_configured():
+            ok = client.submit_rating(skill_name, stars)
+            if ok:
+                c.print(f"[bold green]Rating submitted:[/] {skill_name} → {stars:.1f}★\n")
+            else:
+                c.print(f"[yellow]Saved locally.[/] Could not reach marketplace to submit rating.\n")
+        else:
+            c.print(f"[bold green]Rating saved locally:[/] {skill_name} → {stars:.1f}★\n")
+
+    elif action == "analytics":
+        analytics = get_analytics()
+        summary = analytics.summary()
+        c.print(f"\n[bold]Local Skill Usage Analytics[/]\n")
+        c.print(f"  Total skills used:   {summary['total_skills_used']}")
+        c.print(f"  Total invocations:   {summary['total_invocations']}")
+        c.print(f"  Rated skills:        {summary['total_rated']}")
+        if summary["top_skills"]:
+            c.print(f"\n  [bold]Top Skills:[/]")
+            for entry in summary["top_skills"]:
+                c.print(f"    {entry['name']:<30} {entry['invocations']} calls")
+        c.print("")
+
+    else:
+        c.print(f"[bold red]Unknown marketplace action:[/] {action}\n")
+        c.print("Usage: skills marketplace [featured|rate <name> <stars>|analytics]\n")
+
+
+# ---------------------------------------------------------------------------
 # CLI argparse entry point
 # ---------------------------------------------------------------------------
 
@@ -1009,8 +1133,18 @@ def skills_command(args) -> None:
             _console.print("Usage: hermes skills tap [list|add|remove]\n")
             return
         do_tap(tap_action, repo=repo)
+    elif action == "pin":
+        do_pin(args.name, args.version)
+    elif action == "unpin":
+        do_unpin(args.name)
+    elif action == "rollback":
+        do_rollback(args.name)
+    elif action == "marketplace":
+        mp_action = getattr(args, "marketplace_action", "featured")
+        mp_args = getattr(args, "marketplace_args", [])
+        do_marketplace(mp_action, mp_args)
     else:
-        _console.print("Usage: hermes skills [browse|search|install|inspect|list|check|update|audit|uninstall|publish|snapshot|tap]\n")
+        _console.print("Usage: hermes skills [browse|search|install|inspect|list|check|update|audit|uninstall|publish|snapshot|tap|pin|unpin|rollback|marketplace]\n")
         _console.print("Run 'hermes skills <command> --help' for details.\n")
 
 
@@ -1191,6 +1325,29 @@ def handle_skills_slash(cmd: str, console: Optional[Console] = None) -> None:
         repo = args[1] if len(args) > 1 else ""
         do_tap(tap_action, repo=repo, console=c)
 
+    elif action == "pin":
+        if len(args) < 2:
+            c.print("[bold red]Usage:[/] /skills pin <name> <version>\n")
+            return
+        do_pin(args[0], args[1], console=c)
+
+    elif action == "unpin":
+        if not args:
+            c.print("[bold red]Usage:[/] /skills unpin <name>\n")
+            return
+        do_unpin(args[0], console=c)
+
+    elif action == "rollback":
+        if not args:
+            c.print("[bold red]Usage:[/] /skills rollback <name>\n")
+            return
+        do_rollback(args[0], console=c)
+
+    elif action == "marketplace":
+        mp_action = args[0] if args else "featured"
+        mp_args = args[1:] if len(args) > 1 else []
+        do_marketplace(mp_action, mp_args, console=c)
+
     elif action in ("help", "--help", "-h"):
         _print_skills_help(c)
 
@@ -1214,6 +1371,10 @@ def _print_skills_help(console: Console) -> None:
         "  [cyan]uninstall[/] <name>            Remove a hub-installed skill\n"
         "  [cyan]publish[/] <path> --repo <r>   Publish a skill to GitHub via PR\n"
         "  [cyan]snapshot[/] export|import      Export/import skill configurations\n"
-        "  [cyan]tap[/] list|add|remove         Manage skill sources\n",
+        "  [cyan]tap[/] list|add|remove         Manage skill sources\n"
+        "  [cyan]pin[/] <name> <version>        Pin a skill to a specific version\n"
+        "  [cyan]unpin[/] <name>               Remove a version pin\n"
+        "  [cyan]rollback[/] <name>            Roll back a skill to its previous version\n"
+        "  [cyan]marketplace[/] [featured|rate <n> <stars>|analytics]  Community ratings & trending\n",
         title="/skills",
     ))

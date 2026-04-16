@@ -5790,7 +5790,7 @@ class HermesCLI:
             self._voice_tts_done.set()
 
     def _handle_voice_command(self, command: str):
-        """Handle /voice [on|off|tts|status] command."""
+        """Handle /voice [on|off|tts|status|intents] command."""
         parts = command.strip().split(maxsplit=1)
         subcommand = parts[1].lower().strip() if len(parts) > 1 else ""
 
@@ -5802,6 +5802,8 @@ class HermesCLI:
             self._toggle_voice_tts()
         elif subcommand == "status":
             self._show_voice_status()
+        elif subcommand == "intents":
+            self._show_voice_intents()
         elif subcommand == "":
             # Toggle
             if self._voice_mode:
@@ -5810,7 +5812,7 @@ class HermesCLI:
                 self._enable_voice_mode()
         else:
             _cprint(f"Unknown voice subcommand: {subcommand}")
-            _cprint("Usage: /voice [on|off|tts|status]")
+            _cprint("Usage: /voice [on|off|tts|status|intents]")
 
     def _enable_voice_mode(self):
         """Enable voice mode after checking requirements."""
@@ -5934,6 +5936,23 @@ class HermesCLI:
         _cprint(f"\n  {_BOLD}Requirements:{_RST}")
         for line in reqs["details"].split("\n"):
             _cprint(f"    {line}")
+
+    def _show_voice_intents(self):
+        """Show configured voice command intents."""
+        from hermes_cli.config import load_config
+        from hermes_cli.voice.intents import IntentDispatcher
+
+        config = load_config()
+        dispatcher = IntentDispatcher.from_config(config)
+
+        _cprint(f"\n{_BOLD}Voice Command Intents{_RST}")
+        _cprint(f"{_DIM}Speak any phrase to trigger the corresponding action.{_RST}\n")
+        for intent_name, phrases in dispatcher.get_all_intents().items():
+            display_phrases = ", ".join(f'"{p}"' for p in phrases[:4])
+            if len(phrases) > 4:
+                display_phrases += f" +{len(phrases) - 4} more"
+            _cprint(f"  {_BOLD}{intent_name:<12}{_RST}  {display_phrases}")
+        _cprint(f"\n{_DIM}Edit voice.intents in ~/.hermes/config.yaml to customise.{_RST}")
 
     def _clarify_callback(self, question, choices):
         """
