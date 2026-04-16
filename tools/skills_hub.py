@@ -2358,9 +2358,20 @@ class HubLockFile:
         install_path: str,
         files: List[str],
         metadata: Optional[Dict[str, Any]] = None,
+        version: Optional[str] = None,
     ) -> None:
         data = self.load()
-        data["installed"][name] = {
+        existing = data["installed"].get(name, {})
+        # Preserve version history for rollback support
+        version_history: List[str] = existing.get("version_history", [])
+        prev_version = existing.get("version")
+        if prev_version and prev_version not in version_history:
+            version_history.append(prev_version)
+        # Keep at most 10 history entries
+        if len(version_history) > 10:
+            version_history = version_history[-10:]
+
+        entry: Dict[str, Any] = {
             "source": source,
             "identifier": identifier,
             "trust_level": trust_level,
@@ -2369,10 +2380,50 @@ class HubLockFile:
             "install_path": install_path,
             "files": files,
             "metadata": metadata or {},
-            "installed_at": datetime.now(timezone.utc).isoformat(),
+            "installed_at": existing.get("installed_at", datetime.now(timezone.utc).isoformat()),
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+        if version:
+            entry["version"] = version
+        if version_history:
+            entry["version_history"] = version_history
+        if existing.get("pinned_version"):
+            entry["pinned_version"] = existing["pinned_version"]
+
+        data["installed"][name] = entry
         self.save(data)
+
+    def pin_version(self, name: str, version: str) -> bool:
+        """Pin *name* to *version*.  Returns ``False`` if not installed."""
+        data = self.load()
+        if name not in data["installed"]:
+            return False
+        data["installed"][name]["pinned_version"] = version
+        self.save(data)
+        return True
+
+    def unpin_version(self, name: str) -> bool:
+        """Remove a version pin for *name*.  Returns ``False`` if not installed."""
+        data = self.load()
+        if name not in data["installed"]:
+            return False
+        data["installed"][name].pop("pinned_version", None)
+        self.save(data)
+        return True
+
+    def get_pinned_version(self, name: str) -> Optional[str]:
+        """Return the pinned version for *name*, or ``None`` if unpinned."""
+        entry = self.get_installed(name)
+        if entry:
+            return entry.get("pinned_version")
+        return None
+
+    def get_version_history(self, name: str) -> List[str]:
+        """Return the version history for *name* (most recent last)."""
+        entry = self.get_installed(name)
+        if entry:
+            return list(entry.get("version_history", []))
+        return []
 
     def record_uninstall(self, name: str) -> None:
         data = self.load()
@@ -2546,6 +2597,12 @@ def install_from_quarantine(
 
     # Record in lock file
     lock = HubLockFile()
+    # Extract version from bundle metadata if available
+    _bundle_version = (
+        bundle.metadata.get("version")
+        or bundle.metadata.get("latestVersion")
+        or bundle.metadata.get("tag")
+    )
     lock.record_install(
         name=safe_skill_name,
         source=bundle.source,
@@ -2556,6 +2613,7 @@ def install_from_quarantine(
         install_path=str(install_dir.relative_to(SKILLS_DIR)),
         files=list(bundle.files.keys()),
         metadata=bundle.metadata,
+        version=_bundle_version,
     )
 
     append_audit_log(

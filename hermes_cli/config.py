@@ -428,6 +428,18 @@ DEFAULT_CONFIG = {
         "auto_tts": False,
         "silence_threshold": 200,     # RMS below this = silence (0-32767)
         "silence_duration": 3.0,      # Seconds of silence before auto-stop
+        "continuous": False,          # Auto-restart recording after each response
+        "speech_threshold": 300,      # RMS above this = speech detected
+        # Voice command intent → trigger phrases mapping.
+        # Add or override phrases for any built-in intent here.
+        "intents": {
+            "stop":      ["stop", "stop agent", "cancel", "halt"],
+            "retry":     ["retry", "try again", "repeat"],
+            "summarize": ["summarize", "summarise", "summary"],
+            "clear":     ["clear", "new session", "start over"],
+            "status":    ["status", "show status"],
+            "help":      ["help", "show help"],
+        },
     },
     
     "human_delay": {
