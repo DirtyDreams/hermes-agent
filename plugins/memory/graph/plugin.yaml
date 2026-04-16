@@ -1,0 +1,10 @@
+name: graph
+version: 1.0.0
+description: "Graph-based memory — NetworkX knowledge graph with entity/relationship tracking, temporal decay, and semantic search."
+pip_dependencies:
+  - networkx
+optional_pip_dependencies:
+  - sentence-transformers
+hooks:
+  - on_memory_write
+  - on_session_end
