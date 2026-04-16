@@ -545,8 +545,24 @@ DEFAULT_CONFIG = {
         "backup_count": 3,     # Number of rotated backup files to keep
     },
 
+    # Real-time monitoring dashboard (WebSocket server).
+    # Start with: hermes monitor  (or hermes monitor --port 7799)
+    "web": {
+        "monitoring": {
+            "enabled": False,
+            "host": "127.0.0.1",
+            "port": 7799,
+            "max_sessions_display": 50,
+            "metrics_collection_interval": 5.0,  # seconds between periodic broadcasts
+            "token_stream_buffer": 100,           # max recent token deltas kept in memory
+            # Phase 2: persistent metrics for historical analysis
+            "save_metrics_to_disk": False,        # persist metrics snapshots to disk
+            "metrics_retention_days": 7,          # how long to keep on-disk snapshots
+        },
+    },
+
     # Config schema version - bump this when adding new required fields
-    "_config_version": 12,
+    "_config_version": 13,
 }
 
 # =============================================================================
