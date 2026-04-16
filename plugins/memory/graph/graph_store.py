@@ -23,7 +23,7 @@ from __future__ import annotations
 import json
 import logging
 import math
-import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -259,7 +259,7 @@ class GraphStore:
     ) -> str:
         """Add a timestamped event and link it to the given entity labels."""
         now = _now_iso()
-        event_id = f"event:{int(time.time() * 1000)}"
+        event_id = f"event:{uuid.uuid4().hex[:12]}"
         self._graph.add_node(
             event_id,
             type="event",

@@ -18,6 +18,11 @@ from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
+# Dimension of the hash-bucketed bag-of-words fallback vector.
+# 256 buckets give sufficient resolution for typical vocabulary sizes while
+# keeping memory usage low (one float per bucket, shared across documents).
+_KEYWORD_VECTOR_DIM = 256
+
 # ---------------------------------------------------------------------------
 # Backend detection
 # ---------------------------------------------------------------------------
@@ -176,7 +181,7 @@ class EmbeddingCache:
         # meaningful for computing similarity between two pieces of text.
         # The approach is: represent text as a term-frequency dict, and
         # serialise it as a fixed-length hash-bucketed vector (dim=256).
-        dim = 256
+        dim = _KEYWORD_VECTOR_DIM
         vec = [0.0] * dim
         tokens = text.lower().split()
         total = len(tokens) or 1

@@ -19,6 +19,8 @@ import math
 from datetime import datetime, timezone
 from typing import Optional
 
+_SECONDS_PER_DAY = 86_400
+
 
 class TemporalDecay:
     """Compute exponential decay weights for timestamped memories.
@@ -85,7 +87,7 @@ class TemporalDecay:
                 dt = dt.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             delta = now - dt
-            return max(0.0, delta.total_seconds() / 86_400)
+            return max(0.0, delta.total_seconds() / _SECONDS_PER_DAY)
         except (ValueError, TypeError):
             return None
 

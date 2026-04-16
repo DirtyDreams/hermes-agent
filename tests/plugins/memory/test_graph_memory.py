@@ -29,10 +29,15 @@ if _repo_root not in sys.path:
 
 @pytest.fixture(autouse=True)
 def _isolate_env(tmp_path, monkeypatch):
-    """Redirect HERMES_HOME to a temp dir so no real ~/.hermes is touched."""
+    """Redirect HERMES_HOME to a temp dir so no real ~/.hermes is touched.
+
+    Also mocks Path.home() so profile helpers that rely on it resolve
+    within the temp directory (see development guide: profile tests pattern).
+    """
     hermes_home = tmp_path / ".hermes"
     hermes_home.mkdir()
     monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
 
 
 # ---------------------------------------------------------------------------
@@ -40,7 +45,7 @@ def _isolate_env(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 
 from plugins.memory.graph.graph_store import GraphStore, _normalise
-from plugins.memory.graph.embeddings import EmbeddingCache, _cosine
+from plugins.memory.graph.embeddings import EmbeddingCache, _cosine, _KEYWORD_VECTOR_DIM
 from plugins.memory.graph.decay_calculator import TemporalDecay
 from plugins.memory.graph.analytics import MemoryAnalytics
 from plugins.memory.graph import GraphMemoryProvider, register
@@ -201,7 +206,7 @@ class TestEmbeddingCache:
             vec = cache.embed("Hello world")
             assert isinstance(vec, list)
             assert all(isinstance(v, float) for v in vec)
-            assert len(vec) == 256
+            assert len(vec) == _KEYWORD_VECTOR_DIM
 
     def test_embed_empty_string_returns_empty(self):
         with patch("plugins.memory.graph.embeddings._ST_AVAILABLE", False):

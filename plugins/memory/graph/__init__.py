@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from agent.memory_provider import MemoryProvider
+from hermes_constants import get_hermes_home
 from .graph_store import GraphStore
 from .embeddings import EmbeddingCache
 from .decay_calculator import TemporalDecay
@@ -55,7 +56,7 @@ def _extract_entities_simple(text: str) -> List[str]:
 
 
 def _load_plugin_config(hermes_home: Optional[str] = None) -> Dict[str, Any]:
-    """Read memory.graph config block from config.yaml."""
+    """Read memory.graph config block from config.yaml in *hermes_home*."""
     try:
         from hermes_cli.config import load_config
         cfg = load_config()
@@ -224,7 +225,7 @@ class GraphMemoryProvider(MemoryProvider):
     # ------------------------------------------------------------------
 
     def initialize(self, session_id: str, **kwargs) -> None:
-        self._hermes_home = kwargs.get("hermes_home", str(Path.home() / ".hermes"))
+        self._hermes_home = kwargs.get("hermes_home", str(get_hermes_home()))
         self._agent_context = kwargs.get("agent_context", "primary")
         self._cfg = _load_plugin_config(self._hermes_home)
 
