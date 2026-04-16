@@ -5371,6 +5371,42 @@ For more help on a command:
     acp_parser.set_defaults(func=cmd_acp)
 
     # =========================================================================
+    # monitor command
+    # =========================================================================
+    monitor_parser = subparsers.add_parser(
+        "monitor",
+        help="Start the real-time WebSocket monitoring dashboard",
+        description=(
+            "Start a lightweight WebSocket server that provides a live dashboard\n"
+            "for active Hermes Agent sessions, token streaming, tool execution,\n"
+            "and system metrics."
+        ),
+    )
+    monitor_parser.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the monitoring server on (default: 127.0.0.1)",
+    )
+    monitor_parser.add_argument(
+        "--port",
+        type=int,
+        default=7799,
+        help="Port for the monitoring server (default: 7799)",
+    )
+
+    def cmd_monitor(args):
+        """Start the WebSocket monitoring dashboard."""
+        try:
+            from hermes_cli.web_monitoring import run_monitoring_server
+            run_monitoring_server(host=args.host, port=args.port)
+        except ImportError as exc:
+            print(f"Monitoring server dependencies not available: {exc}")
+            print("Install aiohttp with:  pip install aiohttp")
+            sys.exit(1)
+
+    monitor_parser.set_defaults(func=cmd_monitor)
+
+    # =========================================================================
     # profile command
     # =========================================================================
     profile_parser = subparsers.add_parser(
