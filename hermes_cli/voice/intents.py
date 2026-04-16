@@ -178,6 +178,10 @@ class IntentDispatcher:
         key = intent.value if isinstance(intent, VoiceIntent) else str(intent)
         return list(self._phrase_map.get(key, []))
 
+    def get_all_intents(self) -> Dict[str, List[str]]:
+        """Return a mapping of all intent names to their trigger phrases."""
+        return {k: list(v) for k, v in self._phrase_map.items()}
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------

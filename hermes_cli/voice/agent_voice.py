@@ -156,16 +156,12 @@ class VoiceAgent:
         """Speak *text* via TTS (non-blocking)."""
         if self.tts is None:
             return
-        done_event = threading.Event()
-        done_event.set()
 
         def _on_done() -> None:
-            done_event.set()
             if self._active and self.continuous:
                 self._begin_recording_cycle()
 
         self.tts.on_done = _on_done
-        done_event.clear()
         self.tts.speak_async(text)
 
     def is_active(self) -> bool:

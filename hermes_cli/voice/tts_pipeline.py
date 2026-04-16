@@ -133,9 +133,10 @@ class TTSPipeline:
 
             out_dir = os.path.join(tempfile.gettempdir(), "hermes_voice")
             os.makedirs(out_dir, exist_ok=True)
+            from datetime import datetime as _dt
             mp3_path = os.path.join(
                 out_dir,
-                f"tts_{time.strftime('%Y%m%d_%H%M%S_%f')}.mp3",
+                f"tts_{_dt.now().strftime('%Y%m%d_%H%M%S_%f')}.mp3",
             )
 
             kwargs: Dict[str, Any] = {"text": text, "output_path": mp3_path}

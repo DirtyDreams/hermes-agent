@@ -5947,7 +5947,7 @@ class HermesCLI:
 
         _cprint(f"\n{_BOLD}Voice Command Intents{_RST}")
         _cprint(f"{_DIM}Speak any phrase to trigger the corresponding action.{_RST}\n")
-        for intent_name, phrases in dispatcher._phrase_map.items():
+        for intent_name, phrases in dispatcher.get_all_intents().items():
             display_phrases = ", ".join(f'"{p}"' for p in phrases[:4])
             if len(phrases) > 4:
                 display_phrases += f" +{len(phrases) - 4} more"
